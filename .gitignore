@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Env files (mai committare credenziali)
+.env
+.env.local
+.env.*.local
+
+# Database locale
+*.db
+*.sqlite
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.vercel/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
