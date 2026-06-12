@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -42,6 +42,8 @@ def _get_saldo_iniziale(client) -> float:
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
+_SORT_COLUMNS = {"date", "amount", "category", "description"}
+
 @router.get("")
 @limiter.limit("200/minute")
 async def list_transactions(
@@ -53,8 +55,14 @@ async def list_transactions(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    sort_by: str = Query("date"),
+    sort_dir: str = Query("desc"),
     _user=Depends(get_current_user),
 ):
+    if sort_by not in _SORT_COLUMNS:
+        sort_by = "date"
+    desc = sort_dir != "asc"
+
     client = get_client()
     q = client.table("transactions").select("*", count="exact")
     q = _date_filter(q, from_date, to_date)
@@ -64,7 +72,7 @@ async def list_transactions(
         q = q.eq("source", source)
     if search:
         q = q.ilike("description", f"%{search}%")
-    result = q.order("date", desc=True).range(offset, offset + limit - 1).execute()
+    result = q.order(sort_by, desc=desc).range(offset, offset + limit - 1).execute()
     return {"data": result.data, "total": result.count}
 
 
@@ -108,14 +116,50 @@ async def get_timeline(
     request: Request,
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
-    granularity: str = Query("day", pattern="^(day|month)$"),
+    granularity: str = Query("day", pattern="^(day|week|month)$"),
+    category: Optional[str] = None,
+    spending: bool = False,
     _user=Depends(get_current_user),
 ):
     client = get_client()
+
+    def bucket_key(d_str: str) -> str:
+        if granularity == "week":
+            dt = date.fromisoformat(d_str)
+            return str(dt - timedelta(days=dt.weekday()))
+        if granularity == "month":
+            return d_str[:7]
+        return d_str
+
+    if category or spending:
+        q = (
+            client.table("transactions")
+            .select("date,amount")
+            .limit(_ALL_ROWS)
+            .order("date")
+        )
+        if category:
+            q = q.eq("category", category)
+        if from_date:
+            q = q.gte("date", str(from_date))
+        if to_date:
+            q = q.lte("date", str(to_date))
+        rows = q.execute().data
+        buckets: dict[str, float] = {}
+        for r in rows:
+            if spending and r["amount"] >= 0:
+                continue
+            k = bucket_key(r["date"])
+            buckets[k] = buckets.get(k, 0.0) + abs(r["amount"])
+        timeline = [
+            {"date": d, "saldo_cumulativo": round(buckets[d], 2)}
+            for d in sorted(buckets)
+        ]
+        return {"data": timeline, "saldo_iniziale": 0}
+
     saldo_iniziale = _get_saldo_iniziale(client)
 
     # Fetch ALL transactions up to to_date so the running balance is accurate
-    # even when from_date cuts the view mid-history.
     q = (
         client.table("transactions")
         .select("date,amount")
@@ -126,20 +170,16 @@ async def get_timeline(
         q = q.lte("date", str(to_date))
     rows = q.execute().data
 
-    # Aggregate by day or month bucket
-    buckets: dict[str, float] = {}
+    buckets2: dict[str, float] = {}
     for r in rows:
-        key = r["date"][:7] if granularity == "month" else r["date"][:10]
-        buckets[key] = buckets.get(key, 0.0) + r["amount"]
+        k = bucket_key(r["date"])
+        buckets2[k] = buckets2.get(k, 0.0) + r["amount"]
 
-    # Build cumulative balance; output only keys >= from_date
-    from_key = (
-        str(from_date)[:7 if granularity == "month" else 10] if from_date else None
-    )
+    from_key = bucket_key(str(from_date)) if from_date else None
     running = saldo_iniziale
     timeline = []
-    for d in sorted(buckets):
-        running += buckets[d]
+    for d in sorted(buckets2):
+        running += buckets2[d]
         if from_key is None or d >= from_key:
             timeline.append({"date": d, "saldo_cumulativo": round(running, 2)})
 
@@ -181,6 +221,44 @@ async def update_transaction(
     if not result.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata")
     return result.data[0]
+
+
+class CategoryBody(BaseModel):
+    category: str
+
+
+@router.patch("/{transaction_id}/category")
+@limiter.limit("120/minute")
+async def set_category(
+    request: Request,
+    transaction_id: int,
+    body: CategoryBody,
+    _user=Depends(get_current_user),
+):
+    client = get_client()
+
+    tx = client.table("transactions").select("description").eq("id", transaction_id).execute()
+    if not tx.data:
+        raise HTTPException(status_code=404, detail="Transazione non trovata")
+
+    description = tx.data[0]["description"]
+    pattern = description.lower().strip()
+
+    # Save/update the user rule for this description
+    client.table("user_rules").upsert(
+        {"pattern": pattern, "category": body.category},
+        on_conflict="pattern",
+    ).execute()
+
+    # Update all transactions sharing the same description
+    result = (
+        client.table("transactions")
+        .update({"category": body.category})
+        .eq("description", description)
+        .execute()
+    )
+
+    return {"updated": len(result.data)}
 
 
 @router.delete("/{transaction_id}", status_code=204)

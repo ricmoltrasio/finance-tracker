@@ -7,15 +7,15 @@ import Login from './pages/Login'
 import Overview from './pages/Overview'
 import Transactions from './pages/Transactions'
 import Import from './pages/Import'
-import Categories from './pages/Categories'
 import Settings from './pages/Settings'
+import Budget from './pages/Budget'
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-bg">
         <Spinner />
       </div>
     )
@@ -24,17 +24,17 @@ function ProtectedLayout() {
   if (!user) return <Navigate to="/login" replace />
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="app">
       <Sidebar />
-      <main className="flex-1 overflow-auto pb-16 md:pb-0">
+      <div className="app-main">
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/budget" element={<Budget />} />
           <Route path="/import" element={<Import />} />
-          <Route path="/categories" element={<Categories />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
-      </main>
+      </div>
       <BottomNav />
     </div>
   )

@@ -17,10 +17,14 @@ origins = os.getenv(
     "http://localhost:3000,http://localhost:5173",
 ).split(",")
 
+# In development accept any localhost port (Vite may start on 5174, 5175, etc.)
+origin_regex = r"http://localhost(:\d+)?" if os.getenv("ENV", "development") != "production" else None
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_origin_regex=origin_regex,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

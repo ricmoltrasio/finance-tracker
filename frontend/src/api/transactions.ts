@@ -23,8 +23,8 @@ export const transactionsApi = {
   summary: (from?: string, to?: string) =>
     apiFetch<Summary>(`/transactions/summary${qs({ from, to })}`),
 
-  timeline: (from?: string, to?: string, granularity = 'day') =>
-    apiFetch<Timeline>(`/transactions/timeline${qs({ from, to, granularity })}`),
+  timeline: (from?: string, to?: string, granularity = 'day', category?: string, spending = false) =>
+    apiFetch<Timeline>(`/transactions/timeline${qs({ from, to, granularity, category, spending: spending ? 'true' : undefined })}`),
 
   create: (body: TransactionCreate) =>
     apiFetch<void>('/transactions', { method: 'POST', body: JSON.stringify(body) }),
@@ -33,6 +33,12 @@ export const transactionsApi = {
     apiFetch<void>(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
   delete: (id: number) => apiFetch<void>(`/transactions/${id}`, { method: 'DELETE' }),
+
+  setCategory: (id: number, category: string) =>
+    apiFetch<{ updated: number }>(`/transactions/${id}/category`, {
+      method: 'PATCH',
+      body: JSON.stringify({ category }),
+    }),
 
   split: (id: number, items: { category: string; amount: number; note: string }[]) =>
     apiFetch<void>(`/transactions/${id}/split`, {

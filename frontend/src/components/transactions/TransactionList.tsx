@@ -18,15 +18,11 @@ export function TransactionList({ transactions, loading, onSelect }: Props) {
   }
 
   if (!transactions.length) {
-    return (
-      <div className="py-12 text-center text-sm text-gray-400">
-        Nessuna transazione trovata
-      </div>
-    )
+    return <div className="empty">Nessuna transazione trovata</div>
   }
 
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="txlist d-comoda">
       {transactions.map((t) => (
         <TransactionRow key={t.id} transaction={t} onClick={onSelect} />
       ))}

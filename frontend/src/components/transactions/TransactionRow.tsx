@@ -1,7 +1,7 @@
 import type { Transaction } from '../../types'
-import { CATEGORY_COLORS, CATEGORY_ICONS } from '../../types'
-import { Badge } from '../common/Badge'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { catMeta } from '../../types'
+import { CatGlyph } from '../common/CatGlyph'
+import { formatEUR } from '../../utils/format'
 
 interface Props {
   transaction: Transaction
@@ -9,40 +9,37 @@ interface Props {
 }
 
 export function TransactionRow({ transaction: t, onClick }: Props) {
-  const color = CATEGORY_COLORS[t.category] ?? '#64748B'
-  const icon = CATEGORY_ICONS[t.category] ?? '🏷️'
-  const isIncome = t.amount > 0
+  const { color } = catMeta(t.category)
+  const inc = t.amount > 0
+  const d = new Date(t.date + 'T12:00:00')
 
   return (
-    <div
-      onClick={() => onClick(t)}
-      className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-    >
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base"
-        style={{ backgroundColor: `${color}18` }}
-      >
-        {icon}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-900">{t.description}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-gray-400">{formatDate(t.date)}</span>
-          <Badge color={color}>{t.category}</Badge>
-          {t.source === 'manuale' && (
-            <span className="text-xs text-gray-400">manuale</span>
+    <button className="txrow" onClick={() => onClick(t)}>
+      <CatGlyph category={t.category} size={34} />
+      <div className="txrow-main">
+        <span className="txrow-desc">{t.description}</span>
+        <span className="txrow-sub">
+          <span className="txrow-cat" style={{ color }}>
+            {t.category}
+          </span>
+          <span className="dot">·</span>
+          {t.source === 'manuale' ? 'Manuale' : 'Import'}
+          {t.is_split && (
+            <>
+              <span className="dot">·</span>
+              <span style={{ color: 'var(--accent)' }}>Divisa</span>
+            </>
           )}
-        </div>
+        </span>
       </div>
-
-      <span
-        className={`shrink-0 text-sm font-semibold ${
-          isIncome ? 'text-green-600' : 'text-gray-900'
-        }`}
-      >
-        {isIncome ? '+' : ''}{formatCurrency(t.amount)}
-      </span>
-    </div>
+      <div className="txrow-right">
+        <span className={'txrow-amt ' + (inc ? 'in' : 'out')}>
+          {formatEUR(t.amount, { plus: inc })}
+        </span>
+        <span className="txrow-date">
+          {d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')}
+        </span>
+      </div>
+    </button>
   )
 }

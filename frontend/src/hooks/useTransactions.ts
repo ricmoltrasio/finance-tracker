@@ -26,6 +26,18 @@ export function useUpdateTransaction() {
   })
 }
 
+export function useSetCategory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, category }: { id: number; category: string }) =>
+      transactionsApi.setCategory(id, category),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
+    },
+  })
+}
+
 export function useDeleteTransaction() {
   const qc = useQueryClient()
   return useMutation({

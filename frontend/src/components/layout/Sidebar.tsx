@@ -1,51 +1,54 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, List, Upload, Tag, Settings, LogOut } from 'lucide-react'
+import { Icon } from '../common/Icon'
 import { useAuth } from '../../hooks/useAuth'
 
-const nav = [
-  { path: '/', icon: LayoutDashboard, label: 'Panoramica' },
-  { path: '/transactions', icon: List, label: 'Transazioni' },
-  { path: '/import', icon: Upload, label: 'Importa' },
-  { path: '/categories', icon: Tag, label: 'Categorie' },
-  { path: '/settings', icon: Settings, label: 'Impostazioni' },
+const NAV = [
+  { path: '/', icon: 'overview', label: 'Panoramica' },
+  { path: '/transactions', icon: 'list', label: 'Transazioni' },
+  { path: '/budget', icon: 'wallet', label: 'Budget' },
+  { path: '/import', icon: 'upload', label: 'Importa' },
+  { path: '/settings', icon: 'settings', label: 'Impostazioni' },
 ]
 
 export function Sidebar() {
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
+  const email = user?.email ?? ''
+  const initials = email.slice(0, 2).toUpperCase() || 'FT'
 
   return (
-    <aside className="hidden md:flex w-56 flex-col bg-gray-900 text-gray-300">
-      <div className="px-5 py-6">
-        <span className="text-base font-semibold text-white">Finance Tracker</span>
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">
+          <Icon name="coin" size={18} stroke={2} />
+        </div>
+        <span className="brand-name">Finance Tracker</span>
       </div>
 
-      <nav className="flex-1 px-3">
-        {nav.map(({ path, icon: Icon, label }) => (
+      <nav className="nav">
+        {NAV.map((n) => (
           <NavLink
-            key={path}
-            to={path}
-            end={path === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors mb-0.5 ${
-                isActive
-                  ? 'bg-indigo-600 text-white'
-                  : 'hover:bg-gray-800 hover:text-white'
-              }`
-            }
+            key={n.path}
+            to={n.path}
+            end={n.path === '/'}
+            className={({ isActive }) => 'navitem' + (isActive ? ' on' : '')}
           >
-            <Icon size={18} />
-            {label}
+            <Icon name={n.icon} size={19} stroke={1.8} />
+            <span>{n.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-3">
-        <button
-          onClick={() => signOut()}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-        >
-          <LogOut size={18} />
-          Esci
+      <div className="side-foot">
+        <div className="user" style={{ marginBottom: 4 }}>
+          <div className="avatar">{initials}</div>
+          <div className="user-meta">
+            <span className="user-name">{email || 'Utente'}</span>
+            <span className="user-sub">Account</span>
+          </div>
+        </div>
+        <button className="navitem" style={{ width: '100%' }} onClick={() => signOut()}>
+          <Icon name="logout" size={19} stroke={1.8} />
+          <span>Esci</span>
         </button>
       </div>
     </aside>

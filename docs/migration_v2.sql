@@ -96,7 +96,19 @@ CREATE TABLE IF NOT EXISTS split_items (
 );
 
 
--- ── 7. Tabella audit_log ──────────────────────────────────────────────────────
+-- ── 7. Tabella user_rules ────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS user_rules (
+  id         BIGSERIAL PRIMARY KEY,
+  pattern    TEXT        NOT NULL UNIQUE,
+  category   TEXT        NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_rules_pattern ON user_rules(pattern);
+
+
+-- ── 8. Tabella audit_log ──────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id         BIGSERIAL PRIMARY KEY,

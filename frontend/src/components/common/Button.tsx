@@ -7,10 +7,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300',
-  secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50',
-  danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
-  ghost: 'text-gray-600 hover:bg-gray-100 disabled:opacity-50',
+  primary: 'bg-accent text-[#06120e] hover:brightness-110 disabled:opacity-50 font-semibold',
+  secondary:
+    'bg-surface text-muted border border-white/[0.07] hover:text-label hover:border-white/[0.11] disabled:opacity-50',
+  danger: 'bg-expense/10 text-expense border border-expense/20 hover:bg-expense/20 disabled:opacity-50',
+  ghost: 'text-muted hover:bg-white/5 hover:text-label disabled:opacity-50',
 }
 
 const sizes = {
@@ -19,11 +20,17 @@ const sizes = {
   lg: 'px-5 py-2.5 text-base',
 }
 
-export function Button({ variant = 'primary', size = 'md', className = '', children, ...props }: Props) {
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  className = '',
+  children,
+  ...props
+}: Props) {
   return (
     <button
       {...props}
-      className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center gap-2 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-accent/40 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>

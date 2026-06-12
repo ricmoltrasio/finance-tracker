@@ -26,7 +26,10 @@ async def preview(
     _user=Depends(get_current_user),
 ):
     contents = await file.read()
-    return parse_file_to_rows(contents, file.filename or "file.csv")
+    try:
+        return parse_file_to_rows(contents, file.filename or "file.csv")
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Impossibile leggere il file: {exc}")
 
 
 # ── confirm ───────────────────────────────────────────────────────────────────
@@ -63,8 +66,17 @@ async def confirm(
     if not rows:
         raise HTTPException(status_code=400, detail="Nessuna riga valida trovata nel file")
 
+    client = get_client()
+    user_rules = client.table("user_rules").select("pattern,category").execute().data
+    cats = client.table("categories").select("name,keywords,is_income").execute().data
+    db_categories = {
+        c["name"]: c.get("keywords") or []
+        for c in cats
+        if not c["is_income"] and c.get("keywords")
+    }
+
     for row in rows:
-        row["category"] = categorize(row["description"], row["amount"])
+        row["category"] = categorize(row["description"], row["amount"], user_rules, db_categories)
         row["source"] = "import"
         row["tags"] = []
         row["is_split"] = False
@@ -78,7 +90,6 @@ async def confirm(
 
     if new_rows:
         try:
-            client = get_client()
             client.table("transactions").insert(new_rows).execute()
             imported = len(new_rows)
         except Exception:

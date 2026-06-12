@@ -22,6 +22,7 @@ export interface TransactionCreate {
 
 export interface TransactionUpdate {
   category?: string
+  amount?: number
   note?: string
   tags?: string[]
 }
@@ -82,21 +83,31 @@ export const CATEGORIES = [
 
 export type CategoryName = (typeof CATEGORIES)[number]
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  Cibo: '#6CBF8E',
-  Auto: '#6C9BCF',
-  Salute: '#A78BFA',
-  Intrattenimento: '#EF7B7B',
-  Abbonamenti: '#EC4899',
-  Shopping: '#F59E0B',
-  'Teatro e cinema': '#8B5CF6',
-  Spostamenti: '#14B8A6',
-  Viaggi: '#F97316',
-  Altro: '#64748B',
-  Stipendio: '#10B981',
-  Contanti: '#06B6D4',
-  Rimborsi: '#84CC16',
+/** colore + icona stroke (nome icona del componente Icon) per ogni categoria */
+export const CATEGORY_META: Record<string, { color: string; icon: string }> = {
+  Cibo: { color: '#5FD0A0', icon: 'cart' },
+  Auto: { color: '#6AA6FF', icon: 'car' },
+  Salute: { color: '#5BD1D7', icon: 'heart' },
+  Intrattenimento: { color: '#EF7B7B', icon: 'play' },
+  Abbonamenti: { color: '#B388FF', icon: 'repeat' },
+  Shopping: { color: '#F2A65A', icon: 'bag' },
+  'Teatro e cinema': { color: '#C792EA', icon: 'ticket' },
+  Spostamenti: { color: '#7EE081', icon: 'train' },
+  Viaggi: { color: '#F2C14E', icon: 'plane' },
+  Altro: { color: '#8A93A0', icon: 'dots' },
+  Stipendio: { color: '#4ECB71', icon: 'wallet' },
+  Contanti: { color: '#46C8B0', icon: 'coins' },
+  Rimborsi: { color: '#84CC16', icon: 'refund' },
 }
+
+export function catMeta(category: string) {
+  return CATEGORY_META[category] ?? { color: '#8A93A0', icon: 'dots' }
+}
+
+/** retro-compat: alcune viste leggono ancora questi due record */
+export const CATEGORY_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_META).map(([k, v]) => [k, v.color])
+)
 
 export const CATEGORY_ICONS: Record<string, string> = {
   Cibo: '🍽️',

@@ -18,6 +18,7 @@ def parse_file_to_rows(file_bytes: bytes, filename: str) -> dict:
     Returns: { columns, sample (first 5), raw_rows (all), suggested_profile }
     """
     df = _read_file(file_bytes, filename)
+    df.columns = [str(c) for c in df.columns]
     columns = list(df.columns)
     raw_rows = df.fillna('').astype(str).to_dict('records')
     return {
@@ -82,7 +83,7 @@ def map_rows(
 def _read_file(file_bytes: bytes, filename: str) -> pd.DataFrame:
     ext = filename.rsplit('.', 1)[-1].lower()
     if ext in ('xlsx', 'xls'):
-        return pd.read_excel(io.BytesIO(file_bytes), dtype=str)
+        return pd.read_excel(io.BytesIO(file_bytes), dtype=str, skiprows=18)
 
     text = _decode(file_bytes)
     sample = text[:2000]

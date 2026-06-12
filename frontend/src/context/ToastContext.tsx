@@ -28,12 +28,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`rounded-lg px-4 py-3 text-sm text-white shadow-lg ${
+            className={`rounded-xl px-4 py-3 text-sm font-medium shadow-2xl border ${
               t.type === 'success'
-                ? 'bg-green-600'
+                ? 'bg-income/10 border-income/20 text-income'
                 : t.type === 'error'
-                  ? 'bg-red-600'
-                  : 'bg-gray-800'
+                  ? 'bg-expense/10 border-expense/20 text-expense'
+                  : 'bg-surface border-white/[0.07] text-label'
             }`}
           >
             {t.message}

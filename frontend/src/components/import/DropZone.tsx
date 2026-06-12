@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
-import { Button } from '../common/Button'
+import { Icon } from '../common/Icon'
 import { Spinner } from '../common/Spinner'
 
 interface Props {
@@ -24,7 +23,10 @@ export function DropZone({ onFile, loading, error }: Props) {
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragging(true)
+      }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {
         e.preventDefault()
@@ -32,9 +34,7 @@ export function DropZone({ onFile, loading, error }: Props) {
         const file = e.dataTransfer.files[0]
         if (file) handle(file)
       }}
-      className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
-        dragging ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-gray-50'
-      }`}
+      className={'dropzone' + (dragging ? ' drag' : '')}
     >
       <input
         ref={inputRef}
@@ -50,23 +50,50 @@ export function DropZone({ onFile, loading, error }: Props) {
       {loading ? (
         <>
           <Spinner className="mb-3" />
-          <p className="text-sm text-gray-500">Analisi del file in corso…</p>
+          <p style={{ fontSize: 14, color: 'var(--text-2)' }}>Analisi del file in corso…</p>
         </>
       ) : (
         <>
-          <Upload size={36} className="mb-3 text-gray-300" />
-          <p className="mb-1 text-sm font-medium text-gray-700">
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+              color: 'var(--accent)',
+              marginBottom: 16,
+            }}
+          >
+            <Icon name="upload" size={26} stroke={1.8} />
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>
             Trascina il file qui
           </p>
-          <p className="mb-4 text-xs text-gray-400">CSV o Excel — Intesa SP, UniCredit, Fineco e altri</p>
-          <Button variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>
+          <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 18 }}>
+            CSV o Excel — Intesa SP, UniCredit, Fineco e altri
+          </p>
+          <button className="btn-accent" onClick={() => inputRef.current?.click()}>
             Sfoglia file
-          </Button>
+          </button>
         </>
       )}
 
       {error && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        <p
+          style={{
+            marginTop: 14,
+            borderRadius: 10,
+            padding: '9px 13px',
+            fontSize: 13,
+            color: 'var(--out)',
+            background: 'color-mix(in oklab, var(--out) 12%, transparent)',
+            border: '1px solid color-mix(in oklab, var(--out) 25%, transparent)',
+          }}
+        >
+          {error}
+        </p>
       )}
     </div>
   )

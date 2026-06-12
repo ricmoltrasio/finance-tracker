@@ -8,4 +8,6 @@ export const categoriesApi = {
   update: (id: number, body: Partial<Category>) =>
     apiFetch<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => apiFetch<void>(`/categories/${id}`, { method: 'DELETE' }),
+  recategorizeAll: () =>
+    apiFetch<{ updated: number }>('/categories/recategorize-all', { method: 'POST' }),
 }

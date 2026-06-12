@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import type { PreviewResult, ImportConfirmBody } from '../../api/import'
-import { Button } from '../common/Button'
-import { Select } from '../common/Input'
 import { Spinner } from '../common/Spinner'
 
 interface Props {
@@ -14,12 +12,13 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
   const suggested = preview.suggested_profile
   const colOptions = ['', ...preview.columns]
 
-  const [colDate, setColDate] = useState(suggested?.col_date ?? '')
-  const [colDesc, setColDesc] = useState(suggested?.col_desc ?? '')
+  const cols = preview.columns
+  const [colDate, setColDate] = useState(suggested?.col_date ?? cols[0] ?? '')
+  const [colDesc, setColDesc] = useState(suggested?.col_desc ?? cols[2] ?? '')
   const [amountFormat, setAmountFormat] = useState<'single' | 'dare_avere'>(
     suggested?.amount_format ?? 'single'
   )
-  const [colAmount, setColAmount] = useState(suggested?.col_amount ?? '')
+  const [colAmount, setColAmount] = useState(suggested?.col_amount ?? cols[7] ?? '')
   const [colDare, setColDare] = useState(suggested?.col_dare ?? '')
   const [colAvere, setColAvere] = useState(suggested?.col_avere ?? '')
   const [bankName, setBankName] = useState(suggested?.bank_name ?? '')
@@ -41,40 +40,57 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
   }
 
   const colOpts = colOptions.map((c) => (
-    <option key={c} value={c}>{c || '— seleziona —'}</option>
+    <option key={c} value={c}>
+      {c || '— seleziona —'}
+    </option>
   ))
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-4">
       {suggested && (
-        <div className="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+        <div
+          style={{
+            borderRadius: 11,
+            padding: '10px 13px',
+            fontSize: 13,
+            color: 'var(--accent)',
+            background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+            border: '1px solid color-mix(in oklab, var(--accent) 25%, transparent)',
+          }}
+        >
           Profilo rilevato automaticamente: <strong>{suggested.bank_name}</strong>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Select label="Colonna data" value={colDate} onChange={(e) => setColDate(e.target.value)}>
-          {colOpts}
-        </Select>
-        <Select label="Colonna descrizione" value={colDesc} onChange={(e) => setColDesc(e.target.value)}>
-          {colOpts}
-        </Select>
+        <div>
+          <label className="field-label">Colonna data</label>
+          <select className="field" value={colDate} onChange={(e) => setColDate(e.target.value)}>
+            {colOpts}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Colonna descrizione</label>
+          <select className="field" value={colDesc} onChange={(e) => setColDesc(e.target.value)}>
+            {colOpts}
+          </select>
+        </div>
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium text-gray-700">Formato importo</p>
-        <div className="flex gap-2">
+        <label className="field-label">Formato importo</label>
+        <div className="seg">
           <button
             type="button"
+            className={amountFormat === 'single' ? 'on' : ''}
             onClick={() => setAmountFormat('single')}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium ${amountFormat === 'single' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}
           >
             Colonna singola
           </button>
           <button
             type="button"
+            className={amountFormat === 'dare_avere' ? 'on' : ''}
             onClick={() => setAmountFormat('dare_avere')}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium ${amountFormat === 'dare_avere' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}
           >
             Dare / Avere
           </button>
@@ -82,48 +98,86 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
       </div>
 
       {amountFormat === 'single' ? (
-        <Select label="Colonna importo" value={colAmount} onChange={(e) => setColAmount(e.target.value)}>
-          {colOpts}
-        </Select>
+        <div>
+          <label className="field-label">Colonna importo</label>
+          <select className="field" value={colAmount} onChange={(e) => setColAmount(e.target.value)}>
+            {colOpts}
+          </select>
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <Select label="Colonna Dare (uscite)" value={colDare} onChange={(e) => setColDare(e.target.value)}>
-            {colOpts}
-          </Select>
-          <Select label="Colonna Avere (entrate)" value={colAvere} onChange={(e) => setColAvere(e.target.value)}>
-            {colOpts}
-          </Select>
+          <div>
+            <label className="field-label">Dare (uscite)</label>
+            <select className="field" value={colDare} onChange={(e) => setColDare(e.target.value)}>
+              {colOpts}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Avere (entrate)</label>
+            <select className="field" value={colAvere} onChange={(e) => setColAvere(e.target.value)}>
+              {colOpts}
+            </select>
+          </div>
         </div>
       )}
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Nome banca (opzionale)</label>
+        <label className="field-label">Nome banca (opzionale)</label>
         <input
+          className="field"
           type="text"
           value={bankName}
           onChange={(e) => setBankName(e.target.value)}
           placeholder="es. Intesa Sanpaolo"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
       </div>
 
-      {/* Sample preview */}
+      {/* anteprima */}
       <div>
-        <p className="mb-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Anteprima (5 righe)</p>
-        <div className="overflow-x-auto rounded-lg border border-gray-100">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50">
+        <label className="field-label">Anteprima (5 righe)</label>
+        <div
+          style={{
+            overflowX: 'auto',
+            borderRadius: 11,
+            border: '1px solid var(--line)',
+          }}
+        >
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead style={{ background: 'var(--surface-2)' }}>
               <tr>
                 {preview.columns.map((c) => (
-                  <th key={c} className="px-3 py-2 text-left text-gray-500 font-medium">{c}</th>
+                  <th
+                    key={c}
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      color: 'var(--text-2)',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {c}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {preview.sample.map((row, i) => (
-                <tr key={i} className="border-t border-gray-100">
+                <tr key={i} style={{ borderTop: '1px solid var(--line)' }}>
                   {preview.columns.map((c) => (
-                    <td key={c} className="px-3 py-1.5 text-gray-700 max-w-32 truncate">{row[c]}</td>
+                    <td
+                      key={c}
+                      style={{
+                        padding: '7px 12px',
+                        color: 'var(--text)',
+                        maxWidth: 140,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {row[c]}
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -132,13 +186,20 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
         </div>
       </div>
 
-      <Button
+      <button
+        className="btn-accent"
+        style={{ justifyContent: 'center', width: '100%', padding: '11px' }}
         onClick={handleConfirm}
         disabled={!isValid || loading}
-        className="w-full"
       >
-        {loading ? <><Spinner className="h-4 w-4" /> Importazione in corso…</> : `Importa ${preview.raw_rows.length} righe`}
-      </Button>
+        {loading ? (
+          <>
+            <Spinner className="h-4 w-4" /> Importazione in corso…
+          </>
+        ) : (
+          `Importa ${preview.raw_rows.length} righe`
+        )}
+      </button>
     </div>
   )
 }

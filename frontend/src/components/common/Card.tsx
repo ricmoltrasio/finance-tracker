@@ -10,7 +10,9 @@ export function Card({ children, className = '', onClick }: Props) {
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''} ${className}`}
+      className={`rounded-2xl bg-surface border border-white/[0.07] p-5 ${
+        onClick ? 'cursor-pointer hover:bg-surface2 transition-colors' : ''
+      } ${className}`}
     >
       {children}
     </div>

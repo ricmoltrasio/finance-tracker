@@ -37,5 +37,6 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     category: Optional[str] = None
+    amount: Optional[float] = None
     note: Optional[str] = None
     tags: Optional[list[str]] = None

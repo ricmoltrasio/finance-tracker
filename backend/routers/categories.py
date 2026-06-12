@@ -9,7 +9,11 @@ from db.supabase import get_client
 from deps import get_current_user
 from limiter import limiter
 from services.audit import log
-from services.categorizer import categorize
+from services.categorizer import categorize, EXPENSE_RULES, INCOME_RULES
+
+_HARDCODED_KW: dict[str, list[str]] = {
+    name: kws for name, kws in EXPENSE_RULES + INCOME_RULES
+}
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -34,7 +38,7 @@ class CategoryUpdate(BaseModel):
 @limiter.limit("60/minute")
 async def list_categories(request: Request, _user=Depends(get_current_user)):
     client = get_client()
-    return (
+    rows = (
         client.table("categories")
         .select("*")
         .order("is_income")
@@ -42,6 +46,13 @@ async def list_categories(request: Request, _user=Depends(get_current_user)):
         .execute()
         .data
     )
+    # Lazy seed: if a category has no keywords in DB, write the hardcoded ones
+    to_seed = [r for r in rows if not r.get("keywords") and r["name"] in _HARDCODED_KW]
+    for row in to_seed:
+        kws = _HARDCODED_KW[row["name"]]
+        client.table("categories").update({"keywords": kws}).eq("id", row["id"]).execute()
+        row["keywords"] = kws
+    return rows
 
 
 @router.post("", status_code=201)
@@ -63,7 +74,7 @@ async def update_category(
     _user=Depends(get_current_user),
 ):
     client = get_client()
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    updates = body.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
     result = (
@@ -93,6 +104,15 @@ async def delete_category(
 async def recategorize_all(request: Request, _user=Depends(get_current_user)):
     client = get_client()
 
+    # Load DB categories and user rules so categorize() uses the same keywords shown in UI
+    cats = client.table("categories").select("name,keywords,is_income").execute().data
+    db_categories = {
+        c["name"]: c.get("keywords") or _HARDCODED_KW.get(c["name"], [])
+        for c in cats
+        if not c["is_income"]
+    }
+    user_rules = client.table("user_rules").select("pattern,category").execute().data
+
     rows = (
         client.table("transactions")
         .select("id,description,amount")
@@ -104,7 +124,7 @@ async def recategorize_all(request: Request, _user=Depends(get_current_user)):
     # Group IDs by new category to minimize DB calls (1 per category)
     by_cat: dict[str, list[int]] = {}
     for row in rows:
-        cat = categorize(row["description"], float(row["amount"]))
+        cat = categorize(row["description"], float(row["amount"]), user_rules, db_categories)
         by_cat.setdefault(cat, []).append(row["id"])
 
     updated = 0
