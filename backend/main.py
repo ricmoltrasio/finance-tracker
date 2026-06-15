@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import FastAPI
@@ -7,6 +8,11 @@ from slowapi.errors import RateLimitExceeded
 
 from limiter import limiter
 from routers import categories, import_router, settings, transactions
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
 
 app = FastAPI(title="Finance Tracker API", version="2.0.0", docs_url="/docs")
 app.state.limiter = limiter

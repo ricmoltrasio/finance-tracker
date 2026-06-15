@@ -37,7 +37,12 @@ def _get_saldo_iniziale(client) -> float:
         .eq("key", "saldo_iniziale")
         .execute()
     )
-    return float(result.data[0]["value"]) if result.data else 0.0
+    if not result.data:
+        return 0.0
+    try:
+        return float(result.data[0]["value"])
+    except (TypeError, ValueError):
+        return 0.0
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
@@ -209,7 +214,7 @@ async def update_transaction(
     _user=Depends(get_current_user),
 ):
     client = get_client()
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    updates = body.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
     result = (
@@ -225,6 +230,9 @@ async def update_transaction(
 
 class CategoryBody(BaseModel):
     category: str
+    # Se True: applica la categoria solo a questa transazione, senza creare una
+    # regola sulla descrizione né propagare alle transazioni omonime.
+    only_this: bool = False
 
 
 @router.patch("/{transaction_id}/category")
@@ -240,6 +248,16 @@ async def set_category(
     tx = client.table("transactions").select("description").eq("id", transaction_id).execute()
     if not tx.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata")
+
+    # Solo questa transazione: nessuna regola, nessuna propagazione
+    if body.only_this:
+        result = (
+            client.table("transactions")
+            .update({"category": body.category})
+            .eq("id", transaction_id)
+            .execute()
+        )
+        return {"updated": len(result.data)}
 
     description = tx.data[0]["description"]
     pattern = description.lower().strip()
@@ -314,9 +332,11 @@ async def split_transaction(
 
     client = get_client()
 
-    tx = client.table("transactions").select("amount").eq("id", transaction_id).execute()
+    tx = client.table("transactions").select("amount,is_split").eq("id", transaction_id).execute()
     if not tx.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata")
+    if tx.data[0].get("is_split"):
+        raise HTTPException(status_code=400, detail="Transazione già divisa")
 
     original = float(tx.data[0]["amount"])
     total_split = sum(item.amount for item in body.items)

@@ -1,43 +1,58 @@
 import { supabase } from '../utils/supabase'
 
-export const API_URL = import.meta.env.VITE_API_URL as string
+export const API_URL = import.meta.env.VITE_API_URL
 
-export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+if (!API_URL) {
+  // Fallire subito e in modo chiaro invece di fetch verso "undefined/..."
+  throw new Error('VITE_API_URL non configurata: controlla il file .env del frontend')
+}
+
+async function authHeader(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession()
   const token = session?.access_token
   if (!token) throw new Error('Non autenticato')
+  return { Authorization: `Bearer ${token}` }
+}
 
+/** Estrae il payload JSON se presente; per errori produce un messaggio leggibile
+ *  anche quando il server risponde con HTML/testo (es. 502 da un proxy). */
+async function parseResponse<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T
+
+  let data: unknown = null
+  try {
+    data = await res.json()
+  } catch {
+    if (!res.ok) throw new Error(`Errore del server (HTTP ${res.status})`)
+    throw new Error('Risposta del server non valida')
+  }
+
+  if (!res.ok) {
+    const detail = (data as { detail?: unknown })?.detail
+    throw new Error(typeof detail === 'string' ? detail : `HTTP ${res.status}`)
+  }
+  return data as T
+}
+
+export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(await authHeader()),
       ...options?.headers,
     },
   })
-
-  if (res.status === 204) return undefined as T
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`)
-  return data
+  return parseResponse<T>(res)
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const token = session?.access_token
-  if (!token) throw new Error('Non autenticato')
-
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeader(),
     body: formData,
   })
-
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail ?? `HTTP ${res.status}`)
-  return data
+  return parseResponse<T>(res)
 }

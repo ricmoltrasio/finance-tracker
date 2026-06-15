@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+
 from db.supabase import get_client
+
+logger = logging.getLogger(__name__)
 
 
 async def log(action: str, user_email: str, details: dict, ip: str = "") -> None:
@@ -14,4 +18,6 @@ async def log(action: str, user_email: str, details: dict, ip: str = "") -> None
             "ip": ip,
         }).execute()
     except Exception:
-        pass
+        # L'audit non deve mai bloccare il flusso principale, ma il fallimento
+        # va almeno tracciato nei log applicativi.
+        logger.warning("Scrittura audit_log fallita per action=%s", action, exc_info=True)

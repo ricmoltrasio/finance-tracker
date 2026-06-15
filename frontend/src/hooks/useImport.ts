@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { importApi, type PreviewResult, type ImportConfirmBody, type ImportResult } from '../api/import'
+import { errorMessage } from '../utils/errors'
 
 type Step = 'upload' | 'mapping' | 'done'
 
@@ -19,8 +20,8 @@ export function useImport() {
       const data = await importApi.preview(file)
       setPreview(data)
       setStep('mapping')
-    } catch (e: any) {
-      setError(e.message ?? 'Errore durante il caricamento')
+    } catch (e: unknown) {
+      setError(errorMessage(e, 'Errore durante il caricamento'))
     } finally {
       setLoading(false)
     }
@@ -36,8 +37,8 @@ export function useImport() {
       qc.invalidateQueries({ queryKey: ['transactions'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
       qc.invalidateQueries({ queryKey: ['timeline'] })
-    } catch (e: any) {
-      setError(e.message ?? 'Errore durante l\'importazione')
+    } catch (e: unknown) {
+      setError(errorMessage(e, "Errore durante l'importazione"))
     } finally {
       setLoading(false)
     }

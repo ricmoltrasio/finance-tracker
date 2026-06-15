@@ -1,0 +1,1 @@
+far si che quando una transazione viene inserita o quando viene specificata l'apparteneza a una categoria, ci sia un toggle che permette di non applicare quella categorizzazione a tutte le transazioni con la stessa descrizione ma tenerla valida solo per quella

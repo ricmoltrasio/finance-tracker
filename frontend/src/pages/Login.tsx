@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../hooks/useAuth'
+import { errorMessage } from '../utils/errors'
 import { Icon } from '../components/common/Icon'
 import { Input } from '../components/common/Input'
 import { Button } from '../components/common/Button'
@@ -23,8 +24,8 @@ export default function Login() {
     try {
       await signIn(email, password)
       navigate('/')
-    } catch (e: any) {
-      setError(e.message ?? 'Credenziali non valide')
+    } catch (e: unknown) {
+      setError(errorMessage(e, 'Credenziali non valide'))
     }
   })
 

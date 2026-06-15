@@ -1,12 +1,6 @@
 import { useRef, useState, useMemo, useLayoutEffect } from 'react'
 import type { TimelinePoint } from '../../types'
 
-export interface ChartSeries {
-  name: string
-  color: string
-  data: TimelinePoint[]
-}
-
 interface Props {
   series: TimelinePoint[]
   color?: string
@@ -14,7 +8,6 @@ interface Props {
   mode?: 'curve' | 'bars'
   fmt?: (v: number) => string
   locale?: string
-  multiSeries?: ChartSeries[]
 }
 
 interface Pt {
@@ -49,7 +42,6 @@ export function SaldoChart({
   mode = 'curve',
   fmt,
   locale = 'it-IT',
-  multiSeries,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(720)
@@ -60,8 +52,6 @@ export function SaldoChart({
   const padL = 6
   const padR = 6
 
-  const isMulti = !!multiSeries && multiSeries.length > 0
-
   useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
@@ -71,42 +61,10 @@ export function SaldoChart({
     return () => ro.disconnect()
   }, [])
 
-  // Unified geometry for both modes
   const geom = useMemo(() => {
     const innerW = Math.max(10, w - padL - padR)
     const innerH = H - padT - padB
 
-    if (isMulti && multiSeries) {
-      // Merge all dates across series
-      const dateSet = new Set<string>()
-      multiSeries.forEach(s => s.data.forEach(p => dateSet.add(p.date)))
-      const dates = Array.from(dateSet).sort()
-
-      const allVals = multiSeries.flatMap(s => s.data.map(p => p.saldo_cumulativo))
-      let min = Math.min(0, ...allVals)
-      let max = Math.max(1, ...allVals)
-      const span = max - min || 1
-      min -= span * 0.05
-      max += span * 0.12
-
-      const xFn = (i: number) =>
-        padL + (dates.length <= 1 ? innerW / 2 : (i / (dates.length - 1)) * innerW)
-      const yFn = (v: number) => padT + innerH - ((v - min) / (max - min)) * innerH
-
-      const seriesPts: Pt[][] = multiSeries.map(s => {
-        const map = new Map(s.data.map(p => [p.date, p.saldo_cumulativo]))
-        return dates.map((date, i) => ({
-          x: xFn(i),
-          y: yFn(map.get(date) ?? 0),
-          date,
-          value: map.get(date) ?? 0,
-        }))
-      })
-
-      return { pts: seriesPts[0] ?? [], seriesPts, dates, innerW, innerH }
-    }
-
-    // Single series
     const vals = series.map((s) => s.saldo_cumulativo)
     let min = Math.min(...vals)
     let max = Math.max(...vals)
@@ -122,11 +80,11 @@ export function SaldoChart({
       date: s.date,
       value: s.saldo_cumulativo,
     }))
-    return { pts, seriesPts: null, dates: null, innerW, innerH }
-  }, [series, multiSeries, w, H, isMulti])
+    return { pts, innerW, innerH }
+  }, [series, w, H])
 
   const ticks = useMemo(() => {
-    const src = isMulti ? (geom.dates ?? []) : series.map(s => s.date)
+    const src = series.map(s => s.date)
     if (!src.length) return []
 
     // "YYYY-MM" (monthly granularity) → "YYYY-MM-01" so Date parsing is valid
@@ -155,8 +113,8 @@ export function SaldoChart({
       const everyN = Math.max(1, Math.ceil(totalWeeks / 10))
       const seen = new Set<number>()
 
-      for (let w = 0; w <= totalWeeks; w += everyN) {
-        const target = firstMs + w * weekMs
+      for (let wk = 0; wk <= totalWeeks; wk += everyN) {
+        const target = firstMs + wk * weekMs
         let bestIdx = 0
         let bestDiff = Infinity
         norm.forEach((d, i) => {
@@ -173,7 +131,7 @@ export function SaldoChart({
     }
 
     return out
-  }, [series, geom.dates, isMulti, locale])
+  }, [series, locale])
 
   const imgSrc = useMemo(() => {
     const base = H - padB
@@ -184,27 +142,20 @@ export function SaldoChart({
       })
       .join('')
 
-    const ptsForTicks = isMulti ? geom.pts : geom.pts
     const tk = ticks
       .map((t) => {
-        const p = ptsForTicks[t.i]
+        const p = geom.pts[t.i]
         return p
           ? `<text x="${p.x.toFixed(1)}" y="${H - 10}" fill="rgba(255,255,255,0.42)" font-size="11" font-family="system-ui" font-weight="600" text-anchor="middle" letter-spacing="0.5">${t.label}</text>`
           : ''
       })
       .join('')
 
+    const pts = geom.pts
+    if (!pts.length) return ''
+
     let body: string
-    if (isMulti && multiSeries && geom.seriesPts) {
-      body = geom.seriesPts.map((pts, si) => {
-        if (!pts.length) return ''
-        const c = multiSeries[si].color
-        const d = smoothD(pts)
-        return `<path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round" opacity="0.9"/>`
-      }).join('')
-    } else if (mode === 'bars') {
-      const pts = geom.pts
-      if (!pts.length) return ''
+    if (mode === 'bars') {
       const bw = Math.max(1.5, geom.innerW / series.length - 1.6)
       body = pts
         .map(
@@ -213,8 +164,6 @@ export function SaldoChart({
         )
         .join('')
     } else {
-      const pts = geom.pts
-      if (!pts.length) return ''
       const d = smoothD(pts)
       const area = `${d} L ${pts[pts.length - 1].x.toFixed(1)} ${base} L ${pts[0].x.toFixed(1)} ${base} Z`
       body = `<path d="${area}" fill="url(#g)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round"/>`
@@ -222,7 +171,7 @@ export function SaldoChart({
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.34"/><stop offset="55%" stop-color="${color}" stop-opacity="0.08"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}${body}${tk}</svg>`
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
-  }, [geom, w, H, color, mode, ticks, series.length, isMulti, multiSeries])
+  }, [geom, w, H, color, mode, ticks, series.length])
 
   function onMove(e: React.MouseEvent) {
     if (!wrapRef.current) return
@@ -238,11 +187,8 @@ export function SaldoChart({
   }
 
   const hp = hover != null ? geom.pts[hover] : null
-  const isEmpty = isMulti
-    ? (multiSeries?.every(s => !s.data.length) ?? true)
-    : !series.length
 
-  if (isEmpty) {
+  if (!series.length) {
     return (
       <div style={{ height: H }} className="flex items-center justify-center text-sm text-[var(--text-3)]">
         Nessun dato disponibile
@@ -262,7 +208,7 @@ export function SaldoChart({
           src={imgSrc}
           draggable={false}
           style={{ display: 'block', width: '100%', height: H, userSelect: 'none' }}
-          alt="Grafico"
+          alt="Grafico andamento saldo"
         />
       )}
 
@@ -281,8 +227,8 @@ export function SaldoChart({
         />
       )}
 
-      {/* Dots: multi-series = one dot per series, single = one dot */}
-      {hp && !isMulti && mode !== 'bars' && (
+      {/* Hover dot */}
+      {hp && mode !== 'bars' && (
         <div
           style={{
             position: 'absolute',
@@ -297,26 +243,6 @@ export function SaldoChart({
           }}
         />
       )}
-      {hp && isMulti && multiSeries && geom.seriesPts && geom.seriesPts.map((pts, si) => {
-        const dot = pts[hover!]
-        if (!dot) return null
-        return (
-          <div
-            key={si}
-            style={{
-              position: 'absolute',
-              left: dot.x - 5,
-              top: dot.y - 5,
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: multiSeries[si].color,
-              boxShadow: '0 0 0 2px #0B0D10',
-              pointerEvents: 'none',
-            }}
-          />
-        )
-      })}
 
       {/* Tooltip */}
       {hp && (
@@ -339,20 +265,9 @@ export function SaldoChart({
               weekday: 'short', day: 'numeric', month: 'long',
             })}
           </div>
-          {isMulti && multiSeries && geom.seriesPts
-            ? geom.seriesPts.map((pts, si) => (
-                <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 2 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: multiSeries[si].color, flexShrink: 0, display: 'inline-block' }} />
-                  <span style={{ color: multiSeries[si].color, fontSize: 11, minWidth: 70 }}>{multiSeries[si].name}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt ? fmt(pts[hover!]?.value ?? 0) : (pts[hover!]?.value ?? 0)}</span>
-                </div>
-              ))
-            : (
-              <div style={{ fontSize: 15.5, fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
-                {fmt ? fmt(hp.value) : hp.value}
-              </div>
-            )
-          }
+          <div style={{ fontSize: 15.5, fontWeight: 600, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+            {fmt ? fmt(hp.value) : hp.value}
+          </div>
         </div>
       )}
     </div>

@@ -47,6 +47,4 @@ export const importApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-
-  listProfiles: () => apiFetch<SuggestedProfile[]>('/import/profiles'),
 }

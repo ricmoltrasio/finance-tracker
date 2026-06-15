@@ -1,5 +1,6 @@
 import { apiFetch } from './client'
 import type {
+  Transaction,
   TransactionCreate,
   TransactionUpdate,
   TransactionListResponse,
@@ -27,17 +28,17 @@ export const transactionsApi = {
     apiFetch<Timeline>(`/transactions/timeline${qs({ from, to, granularity, category, spending: spending ? 'true' : undefined })}`),
 
   create: (body: TransactionCreate) =>
-    apiFetch<void>('/transactions', { method: 'POST', body: JSON.stringify(body) }),
+    apiFetch<Transaction>('/transactions', { method: 'POST', body: JSON.stringify(body) }),
 
   update: (id: number, body: TransactionUpdate) =>
     apiFetch<void>(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
 
   delete: (id: number) => apiFetch<void>(`/transactions/${id}`, { method: 'DELETE' }),
 
-  setCategory: (id: number, category: string) =>
+  setCategory: (id: number, category: string, onlyThis = false) =>
     apiFetch<{ updated: number }>(`/transactions/${id}/category`, {
       method: 'PATCH',
-      body: JSON.stringify({ category }),
+      body: JSON.stringify({ category, only_this: onlyThis }),
     }),
 
   split: (id: number, items: { category: string; amount: number; note: string }[]) =>

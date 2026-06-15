@@ -15,6 +15,21 @@ class TransactionCreate(BaseModel):
     note: str = ""
     tags: list[str] = []
 
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("la descrizione non può essere vuota")
+        return v
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: float) -> float:
+        if v == 0:
+            raise ValueError("l'importo non può essere zero")
+        return v
+
     @field_validator("source")
     @classmethod
     def validate_source(cls, v: str) -> str:

@@ -22,8 +22,15 @@ export function CategorySelect({ value, options, onChange, allLabel = 'Tutte le 
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [open])
 
   const select = (v: string) => {
@@ -40,6 +47,9 @@ export function CategorySelect({ value, options, onChange, allLabel = 'Tutte le 
         className={'catsel-trigger' + (value ? ' on' : '')}
         style={value ? { borderColor: color } : undefined}
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Filtra per categoria"
       >
         {value ? (
           <>

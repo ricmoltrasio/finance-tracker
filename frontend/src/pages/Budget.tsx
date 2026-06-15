@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useSummary } from '../hooks/useSummary'
 import { useCategories } from '../hooks/useCategories'
@@ -345,12 +345,21 @@ function CategoryTxDrawer({
   const txs = data?.data ?? []
   const total = txs.reduce((s, t) => s + Math.abs(t.amount), 0)
 
+  // Chiusura con Escape (accessibilità tastiera)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="drawer-scrim" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      <div className="drawer" role="dialog" aria-modal="true" aria-label={category} onClick={(e) => e.stopPropagation()}>
         <div className="drawer-head">
           <span className="drawer-title">{category}</span>
-          <button className="iconbtn" onClick={onClose}>
+          <button className="iconbtn" onClick={onClose} aria-label="Chiudi">
             <Icon name="close" size={18} />
           </button>
         </div>

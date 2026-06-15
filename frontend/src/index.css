@@ -345,6 +345,37 @@ button {
   padding: 2px 0 8px 30px;
 }
 
+/* ---------- toggle switch ---------- */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--line-2);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.switch.on {
+  background: var(--accent);
+}
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.18s;
+}
+.switch.on .switch-knob {
+  transform: translateX(16px);
+}
+
 /* card categoria cliccabile (Budget) */
 .budget-card {
   transition: border-color 0.16s, transform 0.16s, box-shadow 0.16s;

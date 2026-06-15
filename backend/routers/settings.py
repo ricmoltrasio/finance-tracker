@@ -9,9 +9,23 @@ from limiter import limiter
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
-_ALLOWED_KEYS = {"saldo_iniziale", "valuta", "default_import_profile"}
+# key -> tipo atteso del valore (validato in scrittura, castato in lettura)
+_KEY_TYPES = {"saldo_iniziale": "numeric", "valuta": "text", "default_import_profile": "integer"}
+_ALLOWED_KEYS = set(_KEY_TYPES)
 
 _CAST = {"numeric": float, "integer": int, "text": str}
+
+
+def _validate_value(key: str, value: str) -> None:
+    """Impedisce di salvare valori non castabili che romperebbero le letture."""
+    expected = _KEY_TYPES[key]
+    try:
+        _CAST[expected](value)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Valore non valido per '{key}': atteso tipo {expected}",
+        )
 
 
 @router.get("")
@@ -38,6 +52,7 @@ async def update_setting(
 ):
     if key not in _ALLOWED_KEYS:
         raise HTTPException(status_code=400, detail=f"Chiave non valida: {key}")
+    _validate_value(key, body.value)
     client = get_client()
     result = client.table("settings").update({"value": body.value}).eq("key", key).execute()
     if not result.data:

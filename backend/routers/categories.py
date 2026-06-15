@@ -3,27 +3,28 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db.supabase import get_client
 from deps import get_current_user
 from limiter import limiter
 from services.audit import log
-from services.categorizer import categorize, EXPENSE_RULES, INCOME_RULES
-
-_HARDCODED_KW: dict[str, list[str]] = {
-    name: kws for name, kws in EXPENSE_RULES + INCOME_RULES
-}
+from services.categorizer import categorize
+from services.category_keywords import (
+    HARDCODED_KEYWORDS,
+    load_db_categories,
+    load_user_rules,
+)
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 class CategoryCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=60)
     keywords: list[str] = []
     color: str = "#6C9BCF"
     icon: str = "🏷️"
-    budget: Optional[float] = None
+    budget: Optional[float] = Field(default=None, ge=0)
     is_income: bool = False
 
 
@@ -31,7 +32,7 @@ class CategoryUpdate(BaseModel):
     keywords: Optional[list[str]] = None
     color: Optional[str] = None
     icon: Optional[str] = None
-    budget: Optional[float] = None
+    budget: Optional[float] = Field(default=None, ge=0)
 
 
 @router.get("")
@@ -47,9 +48,9 @@ async def list_categories(request: Request, _user=Depends(get_current_user)):
         .data
     )
     # Lazy seed: if a category has no keywords in DB, write the hardcoded ones
-    to_seed = [r for r in rows if not r.get("keywords") and r["name"] in _HARDCODED_KW]
+    to_seed = [r for r in rows if not r.get("keywords") and r["name"] in HARDCODED_KEYWORDS]
     for row in to_seed:
-        kws = _HARDCODED_KW[row["name"]]
+        kws = HARDCODED_KEYWORDS[row["name"]]
         client.table("categories").update({"keywords": kws}).eq("id", row["id"]).execute()
         row["keywords"] = kws
     return rows
@@ -105,13 +106,8 @@ async def recategorize_all(request: Request, _user=Depends(get_current_user)):
     client = get_client()
 
     # Load DB categories and user rules so categorize() uses the same keywords shown in UI
-    cats = client.table("categories").select("name,keywords,is_income").execute().data
-    db_categories = {
-        c["name"]: c.get("keywords") or _HARDCODED_KW.get(c["name"], [])
-        for c in cats
-        if not c["is_income"]
-    }
-    user_rules = client.table("user_rules").select("pattern,category").execute().data
+    db_categories = load_db_categories(client)
+    user_rules = load_user_rules(client)
 
     rows = (
         client.table("transactions")

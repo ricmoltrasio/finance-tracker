@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import type { Transaction, TransactionCreate } from '../../types'
 import { CATEGORIES, catMeta } from '../../types'
@@ -16,6 +16,33 @@ import { SplitForm } from './SplitForm'
 
 const INCOME_CATS = ['Stipendio', 'Contanti', 'Rimborsi']
 
+/** Toggle: limita la categorizzazione alla singola transazione (niente regola/propagazione). */
+function OnlyThisToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 10 }}
+      title="Se attivo, la categoria non viene applicata alle altre transazioni con la stessa descrizione"
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label="Applica solo a questa transazione"
+        className={'switch' + (checked ? ' on' : '')}
+        onClick={() => onChange(!checked)}
+      >
+        <span className="switch-knob" />
+      </button>
+      <span
+        style={{ fontSize: 12.5, color: 'var(--text-2)', cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => onChange(!checked)}
+      >
+        Applica solo a questa transazione
+      </span>
+    </div>
+  )
+}
+
 // ── shell ────────────────────────────────────────────────────────────────────
 
 function DrawerShell({
@@ -27,12 +54,21 @@ function DrawerShell({
   title: string
   children: React.ReactNode
 }) {
+  // Chiusura con Escape (accessibilità tastiera)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="drawer-scrim" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
+      <div className="drawer" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="drawer-head">
           <span className="drawer-title">{title}</span>
-          <button className="iconbtn" onClick={onClose}>
+          <button className="iconbtn" onClick={onClose} aria-label="Chiudi">
             <Icon name="close" size={18} />
           </button>
         </div>
@@ -59,6 +95,7 @@ export function EditDrawer({
   const [note, setNote] = useState(t.note ?? '')
   const [category, setCategory] = useState(t.category)
   const [amountStr, setAmountStr] = useState(String(Math.abs(t.amount)))
+  const [onlyThis, setOnlyThis] = useState(false)
 
   const inc = t.amount > 0
   const d = new Date(t.date + 'T12:00:00')
@@ -66,30 +103,50 @@ export function EditDrawer({
 
   const pickCategory = async (c: string) => {
     setCategory(c)
-    const res = await setCat.mutateAsync({ id: t.id, category: c })
-    const msg = res.updated > 1 ? `Categoria aggiornata (${res.updated} transazioni)` : 'Categoria aggiornata'
-    toast(msg, 'success')
+    try {
+      const res = await setCat.mutateAsync({ id: t.id, category: c, onlyThis })
+      const msg =
+        !onlyThis && res.updated > 1
+          ? `Categoria aggiornata (${res.updated} transazioni)`
+          : 'Categoria aggiornata'
+      toast(msg, 'success')
+    } catch {
+      setCategory(t.category)
+      toast("Errore nell'aggiornamento della categoria", 'error')
+    }
   }
 
   const saveAmount = async () => {
     const parsed = parseFloat(amountStr.replace(',', '.'))
     if (isNaN(parsed) || parsed === Math.abs(t.amount)) return
     const signed = inc ? Math.abs(parsed) : -Math.abs(parsed)
-    await update.mutateAsync({ id: t.id, body: { amount: signed } })
-    toast('Importo aggiornato', 'success')
+    try {
+      await update.mutateAsync({ id: t.id, body: { amount: signed } })
+      toast('Importo aggiornato', 'success')
+    } catch {
+      toast("Errore nell'aggiornamento dell'importo", 'error')
+    }
   }
 
   const saveNote = async () => {
     if (note === (t.note ?? '')) return
-    await update.mutateAsync({ id: t.id, body: { note } })
-    toast('Nota salvata', 'success')
+    try {
+      await update.mutateAsync({ id: t.id, body: { note } })
+      toast('Nota salvata', 'success')
+    } catch {
+      toast('Errore nel salvataggio della nota', 'error')
+    }
   }
 
   const onDelete = async () => {
     if (!confirm('Eliminare questa transazione?')) return
-    await del.mutateAsync(t.id)
-    toast('Transazione eliminata', 'success')
-    onClose()
+    try {
+      await del.mutateAsync(t.id)
+      toast('Transazione eliminata', 'success')
+      onClose()
+    } catch {
+      toast("Errore nell'eliminazione", 'error')
+    }
   }
 
   return (
@@ -171,6 +228,7 @@ export function EditDrawer({
                     )
                   })}
                 </div>
+                <OnlyThisToggle checked={onlyThis} onChange={setOnlyThis} />
               </dd>
             </div>
           </dl>
@@ -214,7 +272,9 @@ type CreateForm = {
 
 export function CreateDrawer({ onClose }: { onClose: () => void }) {
   const [isIncome, setIsIncome] = useState(false)
+  const [onlyThis, setOnlyThis] = useState(false)
   const create = useCreateTransaction()
+  const setCat = useSetCategory()
   const { toast } = useToast()
   const {
     register,
@@ -250,9 +310,18 @@ export function CreateDrawer({ onClose }: { onClose: () => void }) {
       source: 'manuale',
       note: data.note,
     }
-    await create.mutateAsync(body)
-    toast('Transazione aggiunta', 'success')
-    onClose()
+    try {
+      const created = await create.mutateAsync(body)
+      // Default: la categoria scelta vale anche per le altre transazioni con la
+      // stessa descrizione (crea la regola). Col toggle resta solo su questa.
+      if (!onlyThis) {
+        await setCat.mutateAsync({ id: created.id, category: created.category, onlyThis: false })
+      }
+      toast('Transazione aggiunta', 'success')
+      onClose()
+    } catch {
+      toast("Errore nell'aggiunta della transazione", 'error')
+    }
   })
 
   return (
@@ -321,6 +390,7 @@ export function CreateDrawer({ onClose }: { onClose: () => void }) {
               )
             })}
           </div>
+          <OnlyThisToggle checked={onlyThis} onChange={setOnlyThis} />
         </div>
 
         <div>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
@@ -10,10 +11,16 @@ from deps import get_current_user
 from limiter import limiter
 from services.audit import log
 from services.categorizer import categorize
+from services.category_keywords import load_db_categories, load_user_rules
 from services.deduplicator import check_duplicates
 from services.parser import map_rows, parse_file_to_rows
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/import", tags=["import"])
+
+# Limite difensivo sulla dimensione del file caricato (10 MB)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 # ── preview ───────────────────────────────────────────────────────────────────
@@ -26,9 +33,12 @@ async def preview(
     _user=Depends(get_current_user),
 ):
     contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File troppo grande (max 10 MB)")
     try:
         return parse_file_to_rows(contents, file.filename or "file.csv")
     except Exception as exc:
+        logger.warning("Parse fallito per %s: %s", file.filename, exc)
         raise HTTPException(status_code=422, detail=f"Impossibile leggere il file: {exc}")
 
 
@@ -67,13 +77,8 @@ async def confirm(
         raise HTTPException(status_code=400, detail="Nessuna riga valida trovata nel file")
 
     client = get_client()
-    user_rules = client.table("user_rules").select("pattern,category").execute().data
-    cats = client.table("categories").select("name,keywords,is_income").execute().data
-    db_categories = {
-        c["name"]: c.get("keywords") or []
-        for c in cats
-        if not c["is_income"] and c.get("keywords")
-    }
+    user_rules = load_user_rules(client)
+    db_categories = load_db_categories(client)
 
     for row in rows:
         row["category"] = categorize(row["description"], row["amount"], user_rules, db_categories)
@@ -93,6 +98,7 @@ async def confirm(
             client.table("transactions").insert(new_rows).execute()
             imported = len(new_rows)
         except Exception:
+            logger.exception("Insert fallito durante l'import (%d righe)", len(new_rows))
             errors = len(new_rows)
 
     uncategorized = sum(1 for r in new_rows if r.get("category") == "Altro")
