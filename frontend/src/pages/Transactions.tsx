@@ -6,6 +6,9 @@ import { MerchantGroupList } from '../components/transactions/MerchantGroupList'
 import { EditDrawer, CreateDrawer } from '../components/transactions/TransactionDrawer'
 import { Icon } from '../components/common/Icon'
 import { CategorySelect } from '../components/common/CategorySelect'
+import { PeriodChip } from '../components/common/PeriodChip'
+import { MobileSheet } from '../components/common/MobileSheet'
+import { useIsMobile } from '../hooks/useIsMobile'
 import type { Transaction } from '../types'
 import { CATEGORIES } from '../types'
 import { today } from '../utils/format'
@@ -68,10 +71,20 @@ export default function Transactions() {
   const [sortBy, setSortBy]         = useSessionState<SortBy>('tx.sortBy', 'date')
   const [sortDir, setSortDir]       = useSessionState<'asc' | 'desc'>('tx.sortDir', 'desc')
   const [offset, setOffset]         = useSessionState('tx.offset', 0)
+  const [mobileLimit, setMobileLimit] = useState(PAGE_SIZE)
   const [selected, setSelected]     = useState<Transaction | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
 
+  const isMobile = useIsMobile()
   const monthOptions = useMemo(() => lastNMonths(), [])
+
+  // numero di filtri attivi (per il badge del bottone "Filtri" su mobile)
+  const activeFilters = [
+    category !== '',
+    groupMerchants,
+    customMonth !== '' || period !== '3m',
+  ].filter(Boolean).length
 
   const range = getRange(period)
   const from = customFrom || range?.from
@@ -101,8 +114,8 @@ export default function Transactions() {
     sort_by:  sortBy,
     sort_dir: sortDir,
     // in modalità "raggruppa esercenti" carichiamo l'intero set filtrato (no paginazione)
-    limit:    groupMerchants ? 500 : PAGE_SIZE,
-    offset:   groupMerchants ? 0 : offset,
+    limit:    groupMerchants ? 500 : (isMobile ? mobileLimit : PAGE_SIZE),
+    offset:   groupMerchants ? 0 : (isMobile ? 0 : offset),
   }
 
   const { data, isLoading } = useTransactions(params)
@@ -110,7 +123,7 @@ export default function Transactions() {
   const pages = Math.ceil(total / PAGE_SIZE)
   const page  = Math.floor(offset / PAGE_SIZE)
 
-  const resetPage = () => setOffset(0)
+  const resetPage = () => { setOffset(0); setMobileLimit(PAGE_SIZE) }
 
   return (
     <>
@@ -120,108 +133,133 @@ export default function Transactions() {
             <h1 className="page-title">Transazioni</h1>
             <p className="page-sub">{total} movimenti</p>
           </div>
-          <div className="topbar-r">
-            <button className="btn-accent" onClick={() => setShowCreate(true)}>
-              <Icon name="plus" size={16} stroke={2.2} /> Aggiungi
-            </button>
-          </div>
+          {!isMobile && (
+            <div className="topbar-r">
+              <button className="btn-accent" onClick={() => setShowCreate(true)}>
+                <Icon name="plus" size={16} stroke={2.2} /> Aggiungi
+              </button>
+            </div>
+          )}
         </header>
 
-        {/* riga 1: period pills + mese + cerca */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                role="tab"
-                aria-selected={period === p.key && !customMonth}
-                className={'pill' + (period === p.key && !customMonth ? ' on' : '')}
-                onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth(''); resetPage() }}
+        {isMobile ? (
+          /* ── mobile: ricerca + bottone Filtri (il resto va nel foglio) ── */
+          <div className="filterbar">
+            <div className="field-icon" style={{ flex: 1 }}>
+              <Icon name="search" size={15} />
+              <input
+                className="field"
+                type="text"
+                placeholder="Cerca…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); resetPage() }}
+              />
+            </div>
+            <button className="filter-btn" onClick={() => setShowFilters(true)}>
+              <Icon name="grid" size={15} stroke={2} />
+              Filtri
+              {activeFilters > 0 && <span className="cnt">{activeFilters}</span>}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* riga 1: period pills + mese + cerca */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p.key}
+                    role="tab"
+                    aria-selected={period === p.key && !customMonth}
+                    className={'pill' + (period === p.key && !customMonth ? ' on' : '')}
+                    onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth(''); resetPage() }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                className={'pill-select' + (customMonth ? ' on' : '')}
+                value={customMonth}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setCustomMonth(val)
+                  if (val) {
+                    const r = monthRange(val)
+                    setCustomFrom(r.from)
+                    setCustomTo(r.to)
+                  }
+                  resetPage()
+                }}
               >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <select
-            className={'pill-select' + (customMonth ? ' on' : '')}
-            value={customMonth}
-            onChange={(e) => {
-              const val = e.target.value
-              setCustomMonth(val)
-              if (val) {
-                const r = monthRange(val)
-                setCustomFrom(r.from)
-                setCustomTo(r.to)
-              }
-              resetPage()
-            }}
-          >
-            <option value="">Mese…</option>
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <div style={{ marginLeft: 'auto' }} />
-          <CategorySelect
-            value={category}
-            options={CATEGORIES}
-            onChange={(v) => { setCategory(v); resetPage() }}
-          />
-          <div className="field-icon" style={{ flex: '0 0 auto', width: 210, minWidth: 'auto' }}>
-            <Icon name="search" size={14} />
-            <input
-              className="field"
-              type="text"
-              placeholder="Cerca per descrizione…"
-              style={{ fontSize: 12.5, padding: '6px 10px 6px 32px', borderRadius: 9 }}
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); resetPage() }}
-            />
-          </div>
-        </div>
+                <option value="">Mese…</option>
+                {monthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <div style={{ marginLeft: 'auto' }} />
+              <CategorySelect
+                value={category}
+                options={CATEGORIES}
+                onChange={(v) => { setCategory(v); resetPage() }}
+              />
+              <div className="field-icon" style={{ flex: '0 0 auto', width: 210, minWidth: 'auto' }}>
+                <Icon name="search" size={14} />
+                <input
+                  className="field"
+                  type="text"
+                  placeholder="Cerca per descrizione…"
+                  style={{ fontSize: 12.5, padding: '6px 10px 6px 32px', borderRadius: 9 }}
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); resetPage() }}
+                />
+              </div>
+            </div>
 
-        {/* riga 2: ordina + categoria + date */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <div className="sortbar" style={{ margin: 0, flex: '0 0 auto' }}>
-            <span className="sortbar-label">Ordina</span>
-            {SORT_FIELDS.map((f) => {
-              const active = f.key === sortBy
-              const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
-              return (
-                <button
-                  key={f.key}
-                  className={'sortpill' + (active ? ' on' : '')}
-                  onClick={() => pickSort(f.key)}
-                  onDoubleClick={active ? resetSort : undefined}
-                >
-                  {f.label}{arrow}
-                </button>
-              )
-            })}
-          </div>
-          <button
-            className={'sortpill' + (groupMerchants ? ' on' : '')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
-            onClick={() => setGroupMerchants((v) => !v)}
-            title="Raggruppa le transazioni per esercente"
-          >
-            <Icon name="grid" size={13} stroke={2} />
-            Raggruppa esercenti
-          </button>
-          <div style={{ marginLeft: 'auto' }} />
-          <input
-            className="field field-sm"
-            type="date"
-            value={customFrom || range?.from || ''}
-            onChange={(e) => { setCustomFrom(e.target.value); resetPage() }}
-          />
-          <input
-            className="field field-sm"
-            type="date"
-            value={customTo}
-            onChange={(e) => { setCustomTo(e.target.value); resetPage() }}
-          />
-        </div>
+            {/* riga 2: ordina + categoria + date */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div className="sortbar" style={{ margin: 0, flex: '0 0 auto' }}>
+                <span className="sortbar-label">Ordina</span>
+                {SORT_FIELDS.map((f) => {
+                  const active = f.key === sortBy
+                  const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  return (
+                    <button
+                      key={f.key}
+                      className={'sortpill' + (active ? ' on' : '')}
+                      onClick={() => pickSort(f.key)}
+                      onDoubleClick={active ? resetSort : undefined}
+                    >
+                      {f.label}{arrow}
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                className={'sortpill' + (groupMerchants ? ' on' : '')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                onClick={() => setGroupMerchants((v) => !v)}
+                title="Raggruppa le transazioni per esercente"
+              >
+                <Icon name="grid" size={13} stroke={2} />
+                Raggruppa esercenti
+              </button>
+              <div style={{ marginLeft: 'auto' }} />
+              <input
+                className="field field-sm"
+                type="date"
+                value={customFrom || range?.from || ''}
+                onChange={(e) => { setCustomFrom(e.target.value); resetPage() }}
+              />
+              <input
+                className="field field-sm"
+                type="date"
+                value={customTo}
+                onChange={(e) => { setCustomTo(e.target.value); resetPage() }}
+              />
+            </div>
+          </>
+        )}
 
         {/* lista */}
         <div className="card" style={{ padding: 8 }}>
@@ -240,34 +278,150 @@ export default function Transactions() {
           )}
         </div>
 
-        {/* paginazione */}
+        {/* paginazione (desktop) / carica altri (mobile) */}
         {!groupMerchants && total > PAGE_SIZE && (
-          <div className="pager">
-            <span>
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} di {total}
-            </span>
-            <div className="flex items-center gap-2">
+          isMobile ? (
+            mobileLimit < total ? (
               <button
-                className="pager-btn"
-                disabled={page === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                className="btn-soft"
+                style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+                onClick={() => setMobileLimit((l) => l + PAGE_SIZE)}
               >
-                ← Prec
+                Carica altri ({Math.min(PAGE_SIZE, total - mobileLimit)} di {total - mobileLimit} rimanenti)
               </button>
-              <span style={{ color: 'var(--text-2)' }}>
-                {page + 1} / {pages}
+            ) : null
+          ) : (
+            <div className="pager">
+              <span>
+                {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} di {total}
               </span>
-              <button
-                className="pager-btn"
-                disabled={page >= pages - 1}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                Succ →
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="pager-btn"
+                  disabled={page === 0}
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                >
+                  ← Prec
+                </button>
+                <span style={{ color: 'var(--text-2)' }}>
+                  {page + 1} / {pages}
+                </span>
+                <button
+                  className="pager-btn"
+                  disabled={page >= pages - 1}
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                >
+                  Succ →
+                </button>
+              </div>
             </div>
-          </div>
+          )
+        )}
+        {isMobile && (
+          <button className="fab" aria-label="Aggiungi transazione" onClick={() => setShowCreate(true)}>
+            <Icon name="plus" size={24} stroke={2.4} />
+          </button>
         )}
       </main>
+
+      {isMobile && showFilters && (
+        <MobileSheet title="Filtri" onClose={() => setShowFilters(false)}>
+          <div className="sheet-label" style={{ marginTop: 4 }}>Periodo</div>
+          <PeriodChip
+            options={PERIODS}
+            value={period}
+            onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomMonth(''); resetPage() }}
+          />
+
+          <div className="sheet-label">Mese specifico</div>
+          <select
+            className="field"
+            value={customMonth}
+            onChange={(e) => {
+              const val = e.target.value
+              setCustomMonth(val)
+              if (val) {
+                const r = monthRange(val)
+                setCustomFrom(r.from)
+                setCustomTo(r.to)
+              }
+              resetPage()
+            }}
+          >
+            <option value="">Nessuno</option>
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          <div className="sheet-label">Categoria</div>
+          <CategorySelect
+            value={category}
+            options={CATEGORIES}
+            onChange={(v) => { setCategory(v); resetPage() }}
+          />
+
+          <div className="sheet-label">Intervallo date</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="field"
+              type="date"
+              value={customFrom || range?.from || ''}
+              onChange={(e) => { setCustomFrom(e.target.value); resetPage() }}
+            />
+            <input
+              className="field"
+              type="date"
+              value={customTo}
+              onChange={(e) => { setCustomTo(e.target.value); resetPage() }}
+            />
+          </div>
+
+          <div className="sheet-label">Ordina</div>
+          <div className="sortbar" style={{ margin: 0 }}>
+            {SORT_FIELDS.map((f) => {
+              const active = f.key === sortBy
+              const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+              return (
+                <button
+                  key={f.key}
+                  className={'sortpill' + (active ? ' on' : '')}
+                  onClick={() => pickSort(f.key)}
+                >
+                  {f.label}{arrow}
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 18 }}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={groupMerchants}
+              aria-label="Raggruppa esercenti"
+              className={'switch' + (groupMerchants ? ' on' : '')}
+              onClick={() => setGroupMerchants((v) => !v)}
+            >
+              <span className="switch-knob" />
+            </button>
+            <span
+              style={{ fontSize: 13.5, color: 'var(--text-2)' }}
+              onClick={() => setGroupMerchants((v) => !v)}
+            >
+              Raggruppa esercenti
+            </span>
+          </div>
+
+          <button
+            className="btn-accent"
+            style={{ width: '100%', justifyContent: 'center', marginTop: 20 }}
+            onClick={() => setShowFilters(false)}
+          >
+            Mostra risultati
+          </button>
+        </MobileSheet>
+      )}
 
       {selected && <EditDrawer transaction={selected} onClose={() => setSelected(null)} />}
       {showCreate && <CreateDrawer onClose={() => setShowCreate(false)} />}

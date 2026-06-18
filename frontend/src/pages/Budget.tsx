@@ -12,6 +12,8 @@ import { TransactionList } from '../components/transactions/TransactionList'
 import { EditDrawer } from '../components/transactions/TransactionDrawer'
 import { formatEUR } from '../utils/format'
 import { iso, addMonths, addDays, monthLabel, lastNMonths } from '../utils/period'
+import { useIsMobile } from '../hooks/useIsMobile'
+import { PeriodChip } from '../components/common/PeriodChip'
 
 const PROJECTION_CATS = ['Cibo', 'Auto']
 
@@ -33,6 +35,7 @@ export default function Budget() {
   const [customMonth, setCustomMonth] = useState<string>('')
   const [openCat, setOpenCat] = useState<string | null>(null)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  const isMobile = useIsMobile()
 
   const monthOptions = useMemo(() => lastNMonths(), [])
 
@@ -135,31 +138,51 @@ export default function Budget() {
       </header>
 
       {/* Period selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
-          {PILLS.map((p) => (
-            <button
-              key={p.key}
-              role="tab"
-              aria-selected={activePill === p.key && !customMonth}
-              className={'pill' + (activePill === p.key && !customMonth ? ' on' : '')}
-              onClick={() => { setActivePill(p.key); setCustomMonth('') }}
-            >
-              {p.label}
-            </button>
-          ))}
+      {isMobile ? (
+        <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <PeriodChip
+            options={PILLS}
+            value={activePill}
+            onChange={(k) => { setActivePill(k as PillKey); setCustomMonth('') }}
+          />
+          <select
+            className={'field' + (customMonth ? ' on' : '')}
+            value={customMonth}
+            onChange={(e) => setCustomMonth(e.target.value)}
+          >
+            <option value="">Mese specifico…</option>
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
-        <select
-          className={'pill-select' + (customMonth ? ' on' : '')}
-          value={customMonth}
-          onChange={(e) => setCustomMonth(e.target.value)}
-        >
-          <option value="">Mese…</option>
-          {monthOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
+            {PILLS.map((p) => (
+              <button
+                key={p.key}
+                role="tab"
+                aria-selected={activePill === p.key && !customMonth}
+                className={'pill' + (activePill === p.key && !customMonth ? ' on' : '')}
+                onClick={() => { setActivePill(p.key); setCustomMonth('') }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <select
+            className={'pill-select' + (customMonth ? ' on' : '')}
+            value={customMonth}
+            onChange={(e) => setCustomMonth(e.target.value)}
+          >
+            <option value="">Mese…</option>
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {isLoading && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
@@ -170,15 +193,17 @@ export default function Budget() {
       {!isLoading && (
         <>
           {/* KPI row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
             <KpiCard label="Entrate" value={entrate} color="var(--in)" sign="+" />
             <KpiCard label="Spese" value={spese} color="var(--out)" sign="−" />
-            <KpiCard
-              label="Risparmio"
-              value={Math.abs(risparmio)}
-              color={risparmio >= 0 ? 'var(--in)' : 'var(--out)'}
-              sign={risparmio >= 0 ? '+' : '−'}
-            />
+            <div style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
+              <KpiCard
+                label="Risparmio"
+                value={Math.abs(risparmio)}
+                color={risparmio >= 0 ? 'var(--in)' : 'var(--out)'}
+                sign={risparmio >= 0 ? '+' : '−'}
+              />
+            </div>
           </div>
 
           {/* Category cards */}

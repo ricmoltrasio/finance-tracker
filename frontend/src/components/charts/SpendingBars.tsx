@@ -117,17 +117,20 @@ export function SpendingBars({ series, height = 220, fmt, locale = 'it-IT', gran
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
   }, [matrix, hover, w, H, barStep, barW, innerH, padT, padL, padR, series, maxTotal, ticks, n])
 
-  function onMove(e: React.MouseEvent) {
+  function onPickBar(clientX: number, clientY: number) {
     if (!wrapRef.current || n === 0) return
     const rect = wrapRef.current.getBoundingClientRect()
     const actualStep = n > 0 ? Math.max(10, rect.width - padL - padR) / n : 1
-    const mx = e.clientX - rect.left
+    const mx = clientX - rect.left
     const idx = Math.max(0, Math.min(n - 1, Math.floor((mx - padL) / actualStep)))
     setHover(idx)
-    setTipX(e.clientX)
-    setTipY(e.clientY)
+    setTipX(clientX)
+    setTipY(clientY)
     setTipChartY(rect.top)
   }
+
+  function onMove(e: React.MouseEvent) { onPickBar(e.clientX, e.clientY) }
+  function onTouch(e: React.TouchEvent) { e.preventDefault(); onPickBar(e.touches[0].clientX, e.touches[0].clientY) }
 
   if (!series.length || series.every(s => !s.data.length)) {
     return (
@@ -145,6 +148,9 @@ export function SpendingBars({ series, height = 220, fmt, locale = 'it-IT', gran
       style={{ position: 'relative', width: '100%', height: '100%', minHeight: 140 }}
       onMouseMove={onMove}
       onMouseLeave={() => setHover(null)}
+      onTouchStart={onTouch}
+      onTouchMove={onTouch}
+      onTouchEnd={() => setHover(null)}
     >
       {imgSrc && (
         <img src={imgSrc} draggable={false}

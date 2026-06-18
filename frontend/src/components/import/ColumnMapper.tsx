@@ -62,7 +62,7 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="field-label">Colonna data</label>
           <select className="field" value={colDate} onChange={(e) => setColDate(e.target.value)}>
@@ -105,7 +105,7 @@ export function ColumnMapper({ preview, onConfirm, loading }: Props) {
           </select>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="field-label">Dare (uscite)</label>
             <select className="field" value={colDare} onChange={(e) => setColDare(e.target.value)}>

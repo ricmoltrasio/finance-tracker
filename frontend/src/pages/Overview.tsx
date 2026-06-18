@@ -15,8 +15,11 @@ import { useToast } from '../context/ToastContext'
 import { formatEUR, today } from '../utils/format'
 import { iso, addMonths, addDays, prevRange } from '../utils/period'
 import { catMeta } from '../types'
+import { Link } from 'react-router-dom'
 import { transactionsApi } from '../api/transactions'
 import type { Transaction, CategorySummary } from '../types'
+import { useIsMobile } from '../hooks/useIsMobile'
+import { PeriodChip } from '../components/common/PeriodChip'
 
 // ── periodi ──────────────────────────────────────────────────────────────────
 
@@ -101,6 +104,7 @@ function CatBreakdown({
   pinnedCats,
   onSelect,
   onPin,
+  hidePins,
 }: {
   cats: { c: CategorySummary; val: number }[]
   total: number
@@ -108,6 +112,7 @@ function CatBreakdown({
   pinnedCats: string[]
   onSelect: (name: string) => void
   onPin: (name: string) => void
+  hidePins?: boolean
 }) {
   const max = cats[0]?.val || 1
   if (!cats.length) {
@@ -131,21 +136,23 @@ function CatBreakdown({
               <CatGlyph category={c.category} size={26} />
               <span className="catrow-name">{c.category}</span>
               <span className="catrow-amt">{formatEUR(val)}</span>
-              <span
-                role="button"
-                title={isPinned ? 'Rimuovi dal confronto' : 'Fissa nel grafico'}
-                onClick={(e) => { e.stopPropagation(); onPin(c.category) }}
-                style={{
-                  marginLeft: 4,
-                  opacity: isPinned ? 1 : 0.3,
-                  color: isPinned ? color : 'var(--text-2)',
-                  transition: '0.14s',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Icon name="pin" size={14} stroke={isPinned ? 2.2 : 1.6} />
-              </span>
+              {!hidePins && (
+                <span
+                  role="button"
+                  title={isPinned ? 'Rimuovi dal confronto' : 'Fissa nel grafico'}
+                  onClick={(e) => { e.stopPropagation(); onPin(c.category) }}
+                  style={{
+                    marginLeft: 4,
+                    opacity: isPinned ? 1 : 0.3,
+                    color: isPinned ? color : 'var(--text-2)',
+                    transition: '0.14s',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Icon name="pin" size={14} stroke={isPinned ? 2.2 : 1.6} />
+                </span>
+              )}
             </div>
             <div className="catrow-track">
               <div
@@ -219,6 +226,7 @@ export default function Overview() {
   const [pinnedCats, setPinnedCats] = useState<string[]>([])
   const [showAllCats, setShowAllCats] = useState(true)
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
   const range = getRange(period)
   const from = customFrom || range.from
@@ -346,36 +354,46 @@ export default function Overview() {
         </header>
 
         {/* period pills + date pickers */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                role="tab"
-                aria-selected={period === p.key}
-                className={'pill' + (period === p.key ? ' on' : '')}
-                onClick={() => { setPeriod(p.key); setCustomFrom('') }}
-              >
-                {p.label}
-              </button>
-            ))}
+        {isMobile ? (
+          <div style={{ marginBottom: 14 }}>
+            <PeriodChip
+              options={PERIODS.map((p) => ({ key: p.key, label: p.label }))}
+              value={period}
+              onChange={(k) => { setPeriod(k as PeriodKey); setCustomFrom('') }}
+            />
           </div>
-          <div style={{ marginLeft: 'auto' }} />
-          <input
-            className="field"
-            type="date"
-            style={{ width: 140 }}
-            value={customFrom || range.from}
-            onChange={(e) => setCustomFrom(e.target.value)}
-          />
-          <input
-            className="field"
-            type="date"
-            style={{ width: 140 }}
-            value={customTo}
-            onChange={(e) => setCustomTo(e.target.value)}
-          />
-        </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div className="periodbar" style={{ margin: 0, flex: '0 0 auto' }} role="tablist">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  role="tab"
+                  aria-selected={period === p.key}
+                  className={'pill' + (period === p.key ? ' on' : '')}
+                  onClick={() => { setPeriod(p.key); setCustomFrom('') }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginLeft: 'auto' }} />
+            <input
+              className="field"
+              type="date"
+              style={{ width: 140 }}
+              value={customFrom || range.from}
+              onChange={(e) => setCustomFrom(e.target.value)}
+            />
+            <input
+              className="field"
+              type="date"
+              style={{ width: 140 }}
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+            />
+          </div>
+        )}
 
         {loadingSummary ? (
           <div className="flex justify-center py-16">
@@ -482,6 +500,7 @@ export default function Overview() {
                   pinnedCats={pinnedCats}
                   onSelect={handleSelectCat}
                   onPin={handlePinCat}
+                  hidePins={isMobile}
                 />
               </div>
             </section>
@@ -490,9 +509,9 @@ export default function Overview() {
             <section className="card">
               <div className="card-head">
                 <span className="card-eyebrow">Ultime transazioni</span>
-                <button className="link" onClick={() => toast('Vai a Transazioni', 'info')}>
+                <Link to="/transactions" className="link">
                   Vedi tutte <Icon name="chevRight" size={14} stroke={2.2} />
-                </button>
+                </Link>
               </div>
               <RecentList list={recent} onPick={setDrawerTx} />
             </section>

@@ -173,10 +173,10 @@ export function SaldoChart({
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
   }, [geom, w, H, color, mode, ticks, series.length])
 
-  function onMove(e: React.MouseEvent) {
+  function onPickX(clientX: number) {
     if (!wrapRef.current) return
     const rect = wrapRef.current.getBoundingClientRect()
-    const mx = e.clientX - rect.left
+    const mx = clientX - rect.left
     let best = 0
     let bd = Infinity
     geom.pts.forEach((p, i) => {
@@ -185,6 +185,9 @@ export function SaldoChart({
     })
     setHover(best)
   }
+
+  function onMove(e: React.MouseEvent) { onPickX(e.clientX) }
+  function onTouch(e: React.TouchEvent) { e.preventDefault(); onPickX(e.touches[0].clientX) }
 
   const hp = hover != null ? geom.pts[hover] : null
 
@@ -202,6 +205,9 @@ export function SaldoChart({
       style={{ position: 'relative', width: '100%', height: H }}
       onMouseMove={onMove}
       onMouseLeave={() => setHover(null)}
+      onTouchStart={onTouch}
+      onTouchMove={onTouch}
+      onTouchEnd={() => setHover(null)}
     >
       {imgSrc && (
         <img
