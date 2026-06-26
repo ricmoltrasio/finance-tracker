@@ -1,6 +1,6 @@
 """Test unitari per services/categorizer.py (funzione pura, nessun DB)."""
 
-from services.categorizer import categorize, STIPENDIO_THRESHOLD
+from services.categorizer import STIPENDIO_THRESHOLD, categorize
 
 
 class TestStipendio:

@@ -56,7 +56,7 @@ export function MerchantGroupList({ transactions, loading, onSelect }: Props) {
   const toggle = (d: string) =>
     setOpen((s) => {
       const n = new Set(s)
-      n.has(d) ? n.delete(d) : n.add(d)
+      if (n.has(d)) n.delete(d); else n.add(d)
       return n
     })
 

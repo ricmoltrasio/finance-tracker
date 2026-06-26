@@ -16,7 +16,7 @@ logging.basicConfig(
 
 app = FastAPI(title="Finance Tracker API", version="2.0.0", docs_url="/docs")
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 origins = os.getenv(
     "ALLOWED_ORIGINS",

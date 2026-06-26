@@ -1,0 +1,6 @@
+[lint]
+select = ["E", "F", "W", "I"]   # pycodestyle + pyflakes + isort
+ignore = ["E501"]                # ignora linee troppo lunghe
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]        # import inutilizzati negli __init__ vanno bene

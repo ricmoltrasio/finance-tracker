@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Sequence
 
 import pandas as pd
 
@@ -201,7 +201,7 @@ def _detect_profile(columns: list[str]) -> Optional[dict]:
     return None
 
 
-def _find_col(columns: list[str], cols_lower: list[str], hints: list[str]) -> Optional[str]:
+def _find_col(columns: list[str], cols_lower: list[str], hints: Sequence[str]) -> Optional[str]:
     for hint in hints:
         for i, c in enumerate(cols_lower):
             if hint in c:

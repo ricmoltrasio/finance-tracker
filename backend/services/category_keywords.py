@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Caricamento centralizzato delle keyword di categorizzazione.
 
 Il DB è la fonte di verità; le regole hardcoded in `categorizer.py` servono solo
 come seed/fallback. Questo modulo elimina la logica duplicata che prima viveva
 sia in routers/categories.py che in routers/import_router.py.
 """
+
+from __future__ import annotations
 
 from services.categorizer import EXPENSE_RULES, INCOME_RULES
 

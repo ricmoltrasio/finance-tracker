@@ -1,7 +1,7 @@
 import time
 
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from db.supabase import get_client
 
@@ -46,7 +46,7 @@ async def get_current_user(
     try:
         client = get_client()
         response = client.auth.get_user(token)
-        user = response.user
+        user = response.user  # type: ignore[union-attr]
     except Exception:
         raise HTTPException(status_code=401, detail="Token non valido o scaduto")
 

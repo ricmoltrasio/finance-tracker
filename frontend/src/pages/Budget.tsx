@@ -329,6 +329,7 @@ export default function Budget() {
               <Link to="/settings" style={{ color: 'var(--accent)' }}>Impostazioni</Link>.
             </p>
           )}
+
         </>
       )}
 

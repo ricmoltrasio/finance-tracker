@@ -10,6 +10,7 @@ import Transactions from './pages/Transactions'
 import Import from './pages/Import'
 import Settings from './pages/Settings'
 import Budget from './pages/Budget'
+import NotFound from './pages/NotFound'
 
 function ProtectedLayout() {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ function ProtectedLayout() {
           <Route path="/budget" element={<Budget />} />
           <Route path="/import" element={<Import />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
       <BottomNav />

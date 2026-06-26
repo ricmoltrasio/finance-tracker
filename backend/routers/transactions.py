@@ -4,7 +4,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-
 from pydantic import BaseModel
 
 from db.supabase import get_client
@@ -12,7 +11,6 @@ from deps import get_current_user
 from limiter import limiter
 from models.transaction import TransactionCreate, TransactionUpdate
 from services.audit import log
-from services.categorizer import categorize
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -69,7 +67,7 @@ async def list_transactions(
     desc = sort_dir != "asc"
 
     client = get_client()
-    q = client.table("transactions").select("*", count="exact").is_("deleted_at", "null")
+    q = client.table("transactions").select("*", count="exact").is_("deleted_at", "null")  # type: ignore[arg-type]
     q = _date_filter(q, from_date, to_date)
     if category:
         q = q.eq("category", category)

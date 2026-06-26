@@ -1,6 +1,6 @@
 """Test unitari per services/parser.py (parsing date/importi e mappatura righe)."""
 
-from services.parser import map_rows, _parse_amount, _parse_date
+from services.parser import _parse_amount, _parse_date, map_rows
 
 
 class TestParseAmount:

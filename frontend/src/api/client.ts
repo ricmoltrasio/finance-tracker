@@ -21,7 +21,7 @@ async function authHeader(): Promise<Record<string, string>> {
 async function parseResponse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as T
 
-  let data: unknown = null
+  let data: unknown
   try {
     data = await res.json()
   } catch {
