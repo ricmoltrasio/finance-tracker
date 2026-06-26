@@ -100,36 +100,83 @@ async def delete_category(
     client.table("categories").delete().eq("id", category_id).execute()
 
 
-@router.post("/recategorize-all")
-@limiter.limit("5/minute")
-async def recategorize_all(request: Request, _user=Depends(get_current_user)):
-    client = get_client()
+def _do_recategorize(client, rows: list[dict], dry_run: bool = False) -> dict:
+    """Calcola (e applica se dry_run=False) i cambi di categoria.
 
-    # Load DB categories and user rules so categorize() uses the same keywords shown in UI
+    Conta solo le transazioni che effettivamente cambiano categoria.
+    Restituisce {updated, changes: [{id, description, from_cat, to_cat}]}.
+    """
     db_categories = load_db_categories(client)
     user_rules = load_user_rules(client)
 
+    by_new_cat: dict[str, list[dict]] = {}
+    for row in rows:
+        new_cat = categorize(row["description"], float(row["amount"]), user_rules, db_categories)
+        old_cat = row.get("category", "")
+        if new_cat == old_cat:
+            continue
+        by_new_cat.setdefault(new_cat, []).append({
+            "id": row["id"],
+            "description": row["description"],
+            "from_cat": old_cat,
+            "to_cat": new_cat,
+        })
+
+    changes = [item for items in by_new_cat.values() for item in items]
+
+    if not dry_run:
+        for cat, items in by_new_cat.items():
+            ids = [item["id"] for item in items]
+            client.table("transactions").update({"category": cat}).in_("id", ids).execute()
+
+    return {"updated": len(changes), "changes": changes}
+
+
+@router.post("/recategorize-all")
+@limiter.limit("5/minute")
+async def recategorize_all(
+    request: Request,
+    dry_run: bool = False,
+    _user=Depends(get_current_user),
+):
+    client = get_client()
     rows = (
         client.table("transactions")
-        .select("id,description,amount")
+        .select("id,description,amount,category")
+        .is_("deleted_at", "null")
         .limit(50_000)
         .execute()
         .data
     )
+    result = _do_recategorize(client, rows, dry_run=dry_run)
+    if not dry_run:
+        user_email = getattr(_user, "email", "")
+        ip = request.client.host if request.client else ""
+        await log("RECATEGORIZE_ALL", user_email, {"updated": result["updated"]}, ip)
+    return result
 
-    # Group IDs by new category to minimize DB calls (1 per category)
-    by_cat: dict[str, list[int]] = {}
-    for row in rows:
-        cat = categorize(row["description"], float(row["amount"]), user_rules, db_categories)
-        by_cat.setdefault(cat, []).append(row["id"])
 
-    updated = 0
-    for cat, ids in by_cat.items():
-        client.table("transactions").update({"category": cat}).in_("id", ids).execute()
-        updated += len(ids)
-
-    user_email = getattr(_user, "email", "")
-    ip = request.client.host if request.client else ""
-    await log("RECATEGORIZE_ALL", user_email, {"updated": updated}, ip)
-
-    return {"updated": updated}
+@router.post("/recategorize-uncategorized")
+@limiter.limit("5/minute")
+async def recategorize_uncategorized(
+    request: Request,
+    dry_run: bool = False,
+    _user=Depends(get_current_user),
+):
+    """Ricategorizza solo le transazioni ancora in categoria 'Altro'."""
+    client = get_client()
+    rows = (
+        client.table("transactions")
+        .select("id,description,amount,category")
+        .eq("category", "Altro")
+        .is_("deleted_at", "null")
+        .limit(50_000)
+        .execute()
+        .data
+    )
+    result = _do_recategorize(client, rows, dry_run=dry_run)
+    if not dry_run:
+        user_email = getattr(_user, "email", "")
+        ip = request.client.host if request.client else ""
+        await log("RECATEGORIZE_UNCATEGORIZED", user_email, {"updated": result["updated"]}, ip)
+    return result

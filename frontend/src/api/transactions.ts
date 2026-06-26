@@ -8,6 +8,11 @@ import type {
   Timeline,
 } from '../types'
 
+export interface SetCategoryResult {
+  updated: number
+  transactions: Transaction[]
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const p = new URLSearchParams(
     Object.entries(params)
@@ -35,10 +40,16 @@ export const transactionsApi = {
 
   delete: (id: number) => apiFetch<void>(`/transactions/${id}`, { method: 'DELETE' }),
 
-  setCategory: (id: number, category: string, onlyThis = false) =>
-    apiFetch<{ updated: number }>(`/transactions/${id}/category`, {
+  listDeleted: () =>
+    apiFetch<TransactionListResponse>('/transactions/deleted'),
+
+  restore: (id: number) =>
+    apiFetch<Transaction>(`/transactions/${id}/restore`, { method: 'PATCH' }),
+
+  setCategory: (id: number, category: string, onlyThis = false, dryRun = false, ids?: number[]) =>
+    apiFetch<SetCategoryResult>(`/transactions/${id}/category?dry_run=${dryRun}`, {
       method: 'PATCH',
-      body: JSON.stringify({ category, only_this: onlyThis }),
+      body: JSON.stringify({ category, only_this: onlyThis, ids }),
     }),
 
   split: (id: number, items: { category: string; amount: number; note: string }[]) =>

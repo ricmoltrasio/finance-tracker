@@ -45,7 +45,7 @@ export function CategorySelect({ value, options, onChange, allLabel = 'Tutte le 
       <button
         type="button"
         className={'catsel-trigger' + (value ? ' on' : '')}
-        style={value ? { borderColor: color } : undefined}
+        style={value ? { borderColor: color, backgroundColor: `${color}54` } : undefined}
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useSummary } from '../hooks/useSummary'
 import { useTimeline } from '../hooks/useTimeline'
-import { useTransactions } from '../hooks/useTransactions'
+import { useTransactions, useDeletedTransactions, useRestoreTransaction } from '../hooks/useTransactions'
 import { useCountUp } from '../hooks/useCountUp'
 import { SaldoChart } from '../components/charts/SaldoChart'
 import { SpendingBars } from '../components/charts/SpendingBars'
@@ -23,12 +23,13 @@ import { PeriodChip } from '../components/common/PeriodChip'
 
 // ── periodi ──────────────────────────────────────────────────────────────────
 
-type PeriodKey = 'mese' | '3m' | '6m' | 'anno'
+type PeriodKey = 'mese' | '3m' | '6m' | '12m' | 'anno'
 
 const PERIODS: { key: PeriodKey; label: string; granularity: 'day' | 'month' }[] = [
   { key: 'mese', label: 'Questo mese', granularity: 'day' },
-  { key: '3m', label: 'Ultimi 3 mesi', granularity: 'day' },
-  { key: '6m', label: 'Ultimi 6 mesi', granularity: 'day' },
+  { key: '3m',   label: 'Ultimi 3 mesi', granularity: 'day' },
+  { key: '6m',   label: 'Ultimi 6 mesi', granularity: 'day' },
+  { key: '12m',  label: 'Ultimi 12 mesi', granularity: 'month' },
   { key: 'anno', label: "Quest'anno", granularity: 'month' },
 ]
 
@@ -45,6 +46,9 @@ function getRange(key: PeriodKey): { from: string; to: string; label: string } {
   } else if (key === '6m') {
     start = addDays(addMonths(end, -6), 1)
     label = 'Ultimi 6 mesi'
+  } else if (key === '12m') {
+    start = addDays(addMonths(end, -12), 1)
+    label = 'Ultimi 12 mesi'
   } else {
     start = new Date(end.getFullYear(), 0, 1)
     label = String(end.getFullYear())
@@ -211,6 +215,102 @@ function RecentList({
         )
       })}
     </div>
+  )
+}
+
+function DeletedAccordion() {
+  const [open, setOpen] = useState(false)
+  const { data, isLoading } = useDeletedTransactions()
+  const restore = useRestoreTransaction()
+  const { toast } = useToast()
+
+  const list = data?.data ?? []
+
+  const handleRestore = (t: Transaction) => {
+    restore.mutate(t.id, {
+      onSuccess: () => toast(`"${t.description}" ripristinata`, 'success'),
+      onError: () => toast('Errore nel ripristino', 'error'),
+    })
+  }
+
+  if (!isLoading && list.length === 0) return null
+
+  return (
+    <section style={{ marginTop: 32 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          padding: '10px 0', background: 'none', color: 'var(--text-3)',
+          fontSize: 13, fontWeight: 500, cursor: 'pointer',
+        }}
+      >
+        <Icon
+          name="chevDown"
+          size={14}
+          stroke={2}
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '.16s' }}
+        />
+        Transazioni eliminate
+        {list.length > 0 && (
+          <span style={{
+            marginLeft: 4, fontSize: 11, fontWeight: 700,
+            background: 'var(--surface-2)', borderRadius: 999,
+            padding: '1px 7px', color: 'var(--text-2)',
+          }}>
+            {list.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="card" style={{ padding: 8, marginTop: 4 }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}>
+              <Spinner />
+            </div>
+          ) : (
+            <div className="txlist d-comoda">
+              {list.map((t) => {
+                const { color } = catMeta(t.category)
+                const inc = t.amount > 0
+                const d = new Date(t.date + 'T12:00:00')
+                const deletedOn = new Date(t.deleted_at!).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })
+                return (
+                  <div className="txrow" key={t.id} style={{ opacity: 0.7 }}>
+                    <CatGlyph category={t.category} size={34} />
+                    <div className="txrow-main">
+                      <span className="txrow-desc" style={{ textDecoration: 'line-through' }}>{t.description}</span>
+                      <span className="txrow-sub">
+                        <span className="txrow-cat" style={{ color }}>{t.category}</span>
+                        <span className="dot">·</span>
+                        eliminata il {deletedOn}
+                      </span>
+                    </div>
+                    <div className="txrow-right">
+                      <span className={'txrow-amt ' + (inc ? 'in' : 'out')}>
+                        {formatEUR(t.amount, { plus: inc })}
+                      </span>
+                      <span className="txrow-date">
+                        {d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')}
+                      </span>
+                    </div>
+                    <button
+                      className="btn-soft"
+                      style={{ marginLeft: 8, fontSize: 12, padding: '4px 10px', flexShrink: 0 }}
+                      onClick={() => handleRestore(t)}
+                      disabled={restore.isPending}
+                    >
+                      Ripristina
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -517,6 +617,8 @@ export default function Overview() {
             </section>
           </>
         )}
+
+        <DeletedAccordion />
       </main>
 
       {/* FAB */}

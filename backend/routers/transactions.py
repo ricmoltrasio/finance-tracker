@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -69,7 +69,7 @@ async def list_transactions(
     desc = sort_dir != "asc"
 
     client = get_client()
-    q = client.table("transactions").select("*", count="exact")
+    q = client.table("transactions").select("*", count="exact").is_("deleted_at", "null")
     q = _date_filter(q, from_date, to_date)
     if category:
         q = q.eq("category", category)
@@ -81,6 +81,24 @@ async def list_transactions(
     return {"data": result.data, "total": result.count}
 
 
+@router.get("/deleted")
+@limiter.limit("60/minute")
+async def list_deleted_transactions(
+    request: Request,
+    _user=Depends(get_current_user),
+):
+    client = get_client()
+    result = (
+        client.table("transactions")
+        .select("*")
+        .not_.is_("deleted_at", "null")
+        .order("deleted_at", desc=True)
+        .limit(_ALL_ROWS)
+        .execute()
+    )
+    return {"data": result.data, "total": len(result.data)}
+
+
 @router.get("/summary")
 @limiter.limit("60/minute")
 async def get_summary(
@@ -90,7 +108,7 @@ async def get_summary(
     _user=Depends(get_current_user),
 ):
     client = get_client()
-    q = client.table("transactions").select("category,amount").limit(_ALL_ROWS)
+    q = client.table("transactions").select("category,amount").is_("deleted_at", "null").limit(_ALL_ROWS)
     q = _date_filter(q, from_date, to_date)
     rows = q.execute().data
 
@@ -140,6 +158,7 @@ async def get_timeline(
         q = (
             client.table("transactions")
             .select("date,amount")
+            .is_("deleted_at", "null")
             .limit(_ALL_ROWS)
             .order("date")
         )
@@ -164,10 +183,11 @@ async def get_timeline(
 
     saldo_iniziale = _get_saldo_iniziale(client)
 
-    # Fetch ALL transactions up to to_date so the running balance is accurate
+    # Fetch ALL non-deleted transactions up to to_date so the running balance is accurate
     q = (
         client.table("transactions")
         .select("date,amount")
+        .is_("deleted_at", "null")
         .limit(_ALL_ROWS)
         .order("date")
     )
@@ -221,6 +241,7 @@ async def update_transaction(
         client.table("transactions")
         .update(updates)
         .eq("id", transaction_id)
+        .is_("deleted_at", "null")
         .execute()
     )
     if not result.data:
@@ -230,9 +251,8 @@ async def update_transaction(
 
 class CategoryBody(BaseModel):
     category: str
-    # Se True: applica la categoria solo a questa transazione, senza creare una
-    # regola sulla descrizione né propagare alle transazioni omonime.
     only_this: bool = False
+    ids: Optional[list[int]] = None  # se presente, aggiorna solo questi ID specifici
 
 
 @router.patch("/{transaction_id}/category")
@@ -241,42 +261,67 @@ async def set_category(
     request: Request,
     transaction_id: int,
     body: CategoryBody,
+    dry_run: bool = False,
     _user=Depends(get_current_user),
 ):
     client = get_client()
 
-    tx = client.table("transactions").select("description").eq("id", transaction_id).execute()
+    tx = (
+        client.table("transactions")
+        .select("description")
+        .eq("id", transaction_id)
+        .is_("deleted_at", "null")
+        .execute()
+    )
     if not tx.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata")
 
-    # Solo questa transazione: nessuna regola, nessuna propagazione
     if body.only_this:
-        result = (
-            client.table("transactions")
-            .update({"category": body.category})
-            .eq("id", transaction_id)
-            .execute()
-        )
-        return {"updated": len(result.data)}
+        if not dry_run:
+            result = (
+                client.table("transactions")
+                .update({"category": body.category})
+                .eq("id", transaction_id)
+                .execute()
+            )
+        return {"updated": 1, "transactions": []}
 
     description = tx.data[0]["description"]
     pattern = description.lower().strip()
 
-    # Save/update the user rule for this description
+    affected = (
+        client.table("transactions")
+        .select("id,date,description,amount,category")
+        .eq("description", description)
+        .is_("deleted_at", "null")
+        .execute()
+    )
+
+    if dry_run:
+        return {"updated": len(affected.data), "transactions": affected.data}
+
     client.table("user_rules").upsert(
         {"pattern": pattern, "category": body.category},
         on_conflict="pattern",
     ).execute()
 
-    # Update all transactions sharing the same description
-    result = (
-        client.table("transactions")
-        .update({"category": body.category})
-        .eq("description", description)
-        .execute()
-    )
+    if body.ids is not None:
+        result = (
+            client.table("transactions")
+            .update({"category": body.category})
+            .in_("id", body.ids)
+            .execute()
+        )
+    else:
+        result = (
+            client.table("transactions")
+            .update({"category": body.category})
+            .eq("description", description)
+            .is_("deleted_at", "null")
+            .execute()
+        )
 
-    return {"updated": len(result.data)}
+    return {"updated": len(result.data), "transactions": []}
 
 
 @router.delete("/{transaction_id}", status_code=204)
@@ -287,10 +332,12 @@ async def delete_transaction(
     _user=Depends(get_current_user),
 ):
     client = get_client()
+    deleted_at = datetime.now(timezone.utc).isoformat()
     result = (
         client.table("transactions")
-        .delete()
+        .update({"deleted_at": deleted_at})
         .eq("id", transaction_id)
+        .is_("deleted_at", "null")
         .execute()
     )
     if not result.data:
@@ -305,6 +352,26 @@ async def delete_transaction(
         {"transaction_id": transaction_id, "amount": deleted.get("amount")},
         ip,
     )
+
+
+@router.patch("/{transaction_id}/restore", status_code=200)
+@limiter.limit("30/minute")
+async def restore_transaction(
+    request: Request,
+    transaction_id: int,
+    _user=Depends(get_current_user),
+):
+    client = get_client()
+    result = (
+        client.table("transactions")
+        .update({"deleted_at": None})
+        .eq("id", transaction_id)
+        .not_.is_("deleted_at", "null")
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Transazione non trovata o già attiva")
+    return result.data[0]
 
 
 # ── split ─────────────────────────────────────────────────────────────────────
@@ -332,7 +399,13 @@ async def split_transaction(
 
     client = get_client()
 
-    tx = client.table("transactions").select("amount,is_split").eq("id", transaction_id).execute()
+    tx = (
+        client.table("transactions")
+        .select("amount,is_split")
+        .eq("id", transaction_id)
+        .is_("deleted_at", "null")
+        .execute()
+    )
     if not tx.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata")
     if tx.data[0].get("is_split"):

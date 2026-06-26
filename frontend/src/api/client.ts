@@ -36,6 +36,12 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return data as T
 }
 
+async function handleUnauthorized(): Promise<never> {
+  await supabase.auth.signOut()
+  window.location.replace('/login')
+  throw new Error('Sessione scaduta')
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -45,6 +51,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
+  if (res.status === 401) return handleUnauthorized()
   return parseResponse<T>(res)
 }
 
@@ -54,5 +61,6 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
     headers: await authHeader(),
     body: formData,
   })
+  if (res.status === 401) return handleUnauthorized()
   return parseResponse<T>(res)
 }

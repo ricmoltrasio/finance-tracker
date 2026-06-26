@@ -6,6 +6,7 @@ import type { TransactionCreate, TransactionUpdate } from '../types'
 function invalidateTransactionData(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['transactions'] })
   qc.invalidateQueries({ queryKey: ['transactions-infinite'] })
+  qc.invalidateQueries({ queryKey: ['transactions-deleted'] })
   qc.invalidateQueries({ queryKey: ['summary'] })
   qc.invalidateQueries({ queryKey: ['timeline'] })
 }
@@ -53,8 +54,8 @@ export function useUpdateTransaction() {
 export function useSetCategory() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, category, onlyThis }: { id: number; category: string; onlyThis?: boolean }) =>
-      transactionsApi.setCategory(id, category, onlyThis),
+    mutationFn: ({ id, category, onlyThis, ids }: { id: number; category: string; onlyThis?: boolean; ids?: number[] }) =>
+      transactionsApi.setCategory(id, category, onlyThis, false, ids),
     onSuccess: () => invalidateTransactionData(qc),
   })
 }
@@ -63,6 +64,21 @@ export function useDeleteTransaction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => transactionsApi.delete(id),
+    onSuccess: () => invalidateTransactionData(qc),
+  })
+}
+
+export function useDeletedTransactions() {
+  return useQuery({
+    queryKey: ['transactions-deleted'],
+    queryFn: () => transactionsApi.listDeleted(),
+  })
+}
+
+export function useRestoreTransaction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => transactionsApi.restore(id),
     onSuccess: () => invalidateTransactionData(qc),
   })
 }

@@ -11,7 +11,9 @@ import {
   useCreateTransaction,
   useSetCategory,
 } from '../../hooks/useTransactions'
+import { transactionsApi } from '../../api/transactions'
 import { useToast } from '../../context/ToastContext'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { SplitForm } from './SplitForm'
 
 const INCOME_CATS = ['Stipendio', 'Contanti', 'Rimborsi']
@@ -92,29 +94,55 @@ export function EditDrawer({
   const setCat = useSetCategory()
   const { toast } = useToast()
   const [showSplit, setShowSplit] = useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [note, setNote] = useState(t.note ?? '')
   const [category, setCategory] = useState(t.category)
   const [amountStr, setAmountStr] = useState(String(Math.abs(t.amount)))
   const [onlyThis, setOnlyThis] = useState(false)
+  const [pendingCat, setPendingCat] = useState<{ category: string; affected: Transaction[] } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const inc = t.amount > 0
   const d = new Date(t.date + 'T12:00:00')
   const eligible = CATEGORIES.filter((c) => (inc ? INCOME_CATS.includes(c) : !INCOME_CATS.includes(c)))
 
-  const pickCategory = async (c: string) => {
-    setCategory(c)
+  const applyCategory = async (cat: string, only: boolean, ids?: number[]) => {
+    setCategory(cat)
     try {
-      const res = await setCat.mutateAsync({ id: t.id, category: c, onlyThis })
-      const msg =
-        !onlyThis && res.updated > 1
-          ? `Categoria aggiornata (${res.updated} transazioni)`
-          : 'Categoria aggiornata'
-      toast(msg, 'success')
+      const res = await setCat.mutateAsync({ id: t.id, category: cat, onlyThis: only, ids })
+      toast(res.updated > 1 ? `Categoria aggiornata (${res.updated} transazioni)` : 'Categoria aggiornata', 'success')
     } catch {
       setCategory(t.category)
       toast("Errore nell'aggiornamento della categoria", 'error')
     }
+    setPendingCat(null)
   }
+
+  const pickCategory = async (c: string) => {
+    if (onlyThis) { applyCategory(c, true); return }
+    setPreviewLoading(true)
+    try {
+      const preview = await transactionsApi.setCategory(t.id, c, false, true)
+      if (preview.updated <= 1) {
+        applyCategory(c, false)
+      } else {
+        setPendingCat({ category: c, affected: preview.transactions })
+        setSelectedIds(new Set(preview.transactions.map((tx) => tx.id)))
+      }
+    } catch {
+      toast("Errore nel calcolo anteprima", 'error')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const toggleId = (id: number) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
 
   const saveAmount = async () => {
     const parsed = parseFloat(amountStr.replace(',', '.'))
@@ -138,8 +166,7 @@ export function EditDrawer({
     }
   }
 
-  const onDelete = async () => {
-    if (!confirm('Eliminare questa transazione?')) return
+  const doDelete = async () => {
     try {
       await del.mutateAsync(t.id)
       toast('Transazione eliminata', 'success')
@@ -150,8 +177,71 @@ export function EditDrawer({
   }
 
   return (
-    <DrawerShell onClose={onClose} title={showSplit ? 'Dividi transazione' : 'Dettaglio transazione'}>
-      {showSplit ? (
+    <DrawerShell onClose={onClose} title={
+      pendingCat ? 'Riepilogo aggiornamento' :
+      showSplit   ? 'Dividi transazione'     : 'Dettaglio transazione'
+    }>
+      {pendingCat ? (
+        <div>
+          <button className="btn-soft" style={{ marginBottom: 16 }} onClick={() => setPendingCat(null)}>
+            ← Torna al dettaglio
+          </button>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14 }}>
+            Aggiornando <strong style={{ color: catMeta(pendingCat.category).color }}>{pendingCat.category}</strong> verranno
+            modificate <strong>{pendingCat.affected.length}</strong> transazioni con la stessa descrizione:
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '50vh', overflowY: 'auto', marginBottom: 20 }}>
+            {pendingCat.affected.map((tx) => {
+              const txInc = tx.amount > 0
+              const txD = new Date(tx.date + 'T12:00:00')
+              const checked = selectedIds.has(tx.id)
+              return (
+                <button
+                  key={tx.id}
+                  onClick={() => toggleId(tx.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 10, fontSize: 13,
+                    background: checked ? 'var(--surface-2)' : 'transparent',
+                    border: '1px solid ' + (checked ? 'var(--line-2)' : 'transparent'),
+                    opacity: checked ? 1 : 0.45,
+                    textAlign: 'left', cursor: 'pointer', width: '100%',
+                  }}
+                >
+                  <span style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    border: '1.5px solid ' + (checked ? 'var(--accent)' : 'var(--line-2)'),
+                    background: checked ? 'var(--accent)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {checked && <Icon name="check" size={11} stroke={2.5} style={{ color: '#06120e' }} />}
+                  </span>
+                  <span style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                    {txD.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}
+                  </span>
+                  <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {tx.description}
+                  </span>
+                  <span className={'txrow-amt ' + (txInc ? 'in' : 'out')} style={{ fontSize: 13, flexShrink: 0 }}>
+                    {formatEUR(tx.amount, { plus: txInc })}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-soft" onClick={() => setPendingCat(null)}>Annulla</button>
+            <button
+              className="btn-accent"
+              style={{ flex: 1, justifyContent: 'center' }}
+              onClick={() => applyCategory(pendingCat.category, false, [...selectedIds])}
+              disabled={setCat.isPending || selectedIds.size === 0}
+            >
+              {setCat.isPending ? 'Aggiornamento…' : `Conferma (${selectedIds.size})`}
+            </button>
+          </div>
+        </div>
+      ) : showSplit ? (
         <div>
           <button
             className="btn-soft"
@@ -221,6 +311,7 @@ export function EditDrawer({
                             : undefined
                         }
                         onClick={() => pickCategory(c)}
+                        disabled={previewLoading || setCat.isPending}
                       >
                         <CatGlyph category={c} size={15} />
                         {c}
@@ -250,11 +341,19 @@ export function EditDrawer({
                 <Icon name="tag" size={15} /> Dividi
               </button>
             )}
-            <button className="dbtn danger" onClick={onDelete} disabled={del.isPending}>
+            <button className="dbtn danger" onClick={() => setShowConfirmDelete(true)} disabled={del.isPending}>
               <Icon name="close" size={15} /> Elimina
             </button>
           </div>
         </>
+      )}
+      {showConfirmDelete && (
+        <ConfirmDialog
+          message="Eliminare questa transazione? Sarà nascosta ma potrai ripristinarla dalla Panoramica."
+          confirmLabel="Elimina"
+          onConfirm={() => { setShowConfirmDelete(false); doDelete() }}
+          onCancel={() => setShowConfirmDelete(false)}
+        />
       )}
     </DrawerShell>
   )

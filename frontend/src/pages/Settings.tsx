@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSettings, useUpdateSetting } from '../hooks/useSettings'
 import { useCategories } from '../hooks/useCategories'
 import { categoriesApi } from '../api/categories'
+import type { RecategorizeChange } from '../api/categories'
 import { useToast } from '../context/ToastContext'
 import { catMeta } from '../types'
 import type { Category } from '../types'
@@ -94,6 +95,73 @@ function CategoryRow({ cat }: { cat: Category }) {
   )
 }
 
+function RecategorizeDrawer({
+  changes,
+  onApply,
+  onClose,
+  applying,
+}: {
+  changes: RecategorizeChange[]
+  onApply: () => void
+  onClose: () => void
+  applying: boolean
+}) {
+  return (
+    <div className="drawer-scrim" onClick={onClose}>
+      <div className="drawer" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="drawer-head">
+          <span className="drawer-title">Anteprima ricategorizzazione</span>
+          <button className="iconbtn" onClick={onClose} aria-label="Chiudi">
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+
+        {changes.length === 0 ? (
+          <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>
+            Nessuna transazione da aggiornare.
+          </p>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>
+              {changes.length} {changes.length === 1 ? 'transazione verrà aggiornata' : 'transazioni verranno aggiornate'}.
+              Controlla e conferma.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '55vh', overflowY: 'auto', marginBottom: 20 }}>
+              {changes.map((c) => (
+                <div key={c.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)',
+                  fontSize: 13,
+                }}>
+                  <CatGlyph category={c.from_cat} size={28} />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
+                    {c.description}
+                  </span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                    <span style={{ color: catMeta(c.from_cat).color }}>{c.from_cat}</span>
+                    {' → '}
+                    <span style={{ color: catMeta(c.to_cat).color, fontWeight: 600 }}>{c.to_cat}</span>
+                  </span>
+                  <CatGlyph category={c.to_cat} size={28} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn-soft" onClick={onClose} disabled={applying}>Annulla</button>
+          {changes.length > 0 && (
+            <button className="btn-accent" onClick={onApply} disabled={applying}>
+              {applying ? 'Applicazione…' : 'Applica'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Settings() {
   const { data: settings, isLoading } = useSettings()
   const update = useUpdateSetting()
@@ -101,31 +169,46 @@ export default function Settings() {
   const qc = useQueryClient()
 
   const [saldo, setSaldo] = useState('')
-  const [valuta, setValuta] = useState('EUR')
+  const [reviewChanges, setReviewChanges] = useState<RecategorizeChange[] | null>(null)
+  const [pendingAction, setPendingAction] = useState<'all' | 'uncategorized' | null>(null)
 
   const { data: categories, isLoading: loadingCats } = useCategories()
 
-  const recategorize = useMutation({
-    mutationFn: () => categoriesApi.recategorizeAll(),
+  const preview = useMutation({
+    mutationFn: (mode: 'all' | 'uncategorized') =>
+      mode === 'all'
+        ? categoriesApi.recategorizeAll(true)
+        : categoriesApi.recategorizeUncategorized(true),
+    onSuccess: (data, mode) => {
+      setReviewChanges(data.changes)
+      setPendingAction(mode)
+    },
+    onError: () => toast('Errore nel calcolo anteprima', 'error'),
+  })
+
+  const apply = useMutation({
+    mutationFn: () =>
+      pendingAction === 'all'
+        ? categoriesApi.recategorizeAll(false)
+        : categoriesApi.recategorizeUncategorized(false),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['transactions-infinite'] })
       qc.invalidateQueries({ queryKey: ['summary'] })
-      toast(`${data.updated} transazioni ricategorizzate`, 'success')
+      setReviewChanges(null)
+      setPendingAction(null)
+      toast(data.updated > 0 ? `${data.updated} transazioni aggiornate` : 'Nessuna transazione aggiornata', 'success')
     },
     onError: () => toast('Errore nella ricategorizzazione', 'error'),
   })
 
   useEffect(() => {
-    if (settings) {
-      setSaldo(settings.saldo_iniziale ?? '0')
-      setValuta(settings.valuta ?? 'EUR')
-    }
+    if (settings) setSaldo(settings.saldo_iniziale ?? '0')
   }, [settings])
 
   const save = async () => {
     try {
       await update.mutateAsync({ key: 'saldo_iniziale', value: saldo })
-      await update.mutateAsync({ key: 'valuta', value: valuta })
       toast('Impostazioni salvate', 'success')
     } catch {
       toast('Errore nel salvataggio', 'error')
@@ -144,41 +227,21 @@ export default function Settings() {
         </div>
       </header>
 
-      <div className="settings-grid" style={{ marginBottom: 16 }}>
-        <div className="card">
-          <p className="card-eyebrow" style={{ marginBottom: 8 }}>
-            Saldo di partenza
-          </p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.5 }}>
-            Il saldo del conto quando hai iniziato a usare l'app. Tutti i calcoli dell'andamento
-            partono da questo valore.
-          </p>
-          <label className="field-label">Saldo iniziale (€)</label>
-          <input
-            className="field"
-            type="number"
-            step="0.01"
-            value={saldo}
-            onChange={(e) => setSaldo(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="card">
-          <p className="card-eyebrow" style={{ marginBottom: 8 }}>
-            Valuta
-          </p>
-          <select className="field" value={valuta} onChange={(e) => setValuta(e.target.value)}>
-            <option value="EUR">EUR — Euro</option>
-            <option value="USD">USD — Dollaro</option>
-            <option value="GBP">GBP — Sterlina</option>
-          </select>
-        </div>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: '10px 14px' }}>
+        <p className="card-eyebrow" style={{ margin: 0, whiteSpace: 'nowrap' }}>Saldo di partenza</p>
+        <input
+          className="field"
+          type="number"
+          step="0.01"
+          value={saldo}
+          onChange={(e) => setSaldo(e.target.value)}
+          disabled={isLoading}
+          style={{ width: 140, margin: 0 }}
+        />
+        <button className="btn-accent" onClick={save} disabled={update.isPending || isLoading} style={{ whiteSpace: 'nowrap' }}>
+          {update.isPending ? 'Salvataggio…' : 'Salva'}
+        </button>
       </div>
-
-      <button className="btn-accent" onClick={save} disabled={update.isPending || isLoading}>
-        {update.isPending ? 'Salvataggio…' : 'Salva impostazioni'}
-      </button>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '36px 0 14px' }}>
         <div>
@@ -187,14 +250,24 @@ export default function Settings() {
             Parole chiave per la categorizzazione automatica
           </p>
         </div>
-        <button
-          className="btn-soft"
-          onClick={() => recategorize.mutate()}
-          disabled={recategorize.isPending}
-        >
-          <Icon name="repeat" size={15} stroke={2} />
-          {recategorize.isPending ? 'In corso…' : 'Ricategorizza tutto'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn-soft"
+            onClick={() => preview.mutate('uncategorized')}
+            disabled={preview.isPending}
+          >
+            <Icon name="repeat" size={15} stroke={2} />
+            {preview.isPending && pendingAction === 'uncategorized' ? 'Calcolo…' : 'Solo "Altro"'}
+          </button>
+          <button
+            className="btn-soft"
+            onClick={() => preview.mutate('all')}
+            disabled={preview.isPending}
+          >
+            <Icon name="repeat" size={15} stroke={2} />
+            {preview.isPending && pendingAction === 'all' ? 'Calcolo…' : 'Ricategorizza tutto'}
+          </button>
+        </div>
       </div>
 
       {loadingCats && (
@@ -223,6 +296,15 @@ export default function Settings() {
             ))}
           </div>
         </section>
+      )}
+
+      {reviewChanges !== null && (
+        <RecategorizeDrawer
+          changes={reviewChanges}
+          applying={apply.isPending}
+          onApply={() => apply.mutate()}
+          onClose={() => { setReviewChanges(null); setPendingAction(null) }}
+        />
       )}
     </main>
   )

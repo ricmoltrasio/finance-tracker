@@ -19,12 +19,13 @@ const PROJECTION_CATS = ['Cibo', 'Auto']
 
 const PILLS = [
   { key: 'mese' as const, label: 'Questo mese' },
-  { key: '3m' as const, label: '3 mesi' },
-  { key: '6m' as const, label: '6 mesi' },
+  { key: '3m'  as const, label: '3 mesi' },
+  { key: '6m'  as const, label: '6 mesi' },
+  { key: '12m' as const, label: '12 mesi' },
   { key: 'anno' as const, label: 'Anno' },
 ]
 
-type PillKey = 'mese' | '3m' | '6m' | 'anno'
+type PillKey = 'mese' | '3m' | '6m' | '12m' | 'anno'
 
 export default function Budget() {
   const now = new Date()
@@ -80,6 +81,8 @@ export default function Budget() {
         return { fromStr: iso(addDays(addMonths(end, -3), 1)), toStr: iso(end), periodDisplay: 'Ultimi 3 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
       if (activePill === '6m')
         return { fromStr: iso(addDays(addMonths(end, -6), 1)), toStr: iso(end), periodDisplay: 'Ultimi 6 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
+      if (activePill === '12m')
+        return { fromStr: iso(addDays(addMonths(end, -12), 1)), toStr: iso(end), periodDisplay: 'Ultimi 12 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
 
       // anno
       return {
@@ -207,7 +210,7 @@ export default function Budget() {
           </div>
 
           {/* Category cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(400px, 100%), 1fr))', gap: 12 }}>
             {expenseCats.map((cat) => {
               const budget = isSingleMonth && cat.hasBudget ? cat.budget! : null
               const pct = budget ? Math.min(1, cat.spent / budget) : null
