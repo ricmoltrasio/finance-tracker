@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Frontend: lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": "test",
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": "$eslint-stylish"
+    },
+    {
+      "label": "Frontend: type-check",
+      "type": "shell",
+      "command": "npm run type-check",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": "test",
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Backend: lint",
+      "type": "shell",
+      "command": "ruff check .",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": "test",
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: type-check",
+      "type": "shell",
+      "command": "mypy . --ignore-missing-imports",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "group": "test",
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Check tutto",
+      "dependsOn": [
+        "Frontend: lint",
+        "Frontend: type-check",
+        "Backend: lint",
+        "Backend: type-check"
+      ],
+      "dependsOrder": "parallel",
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "panel": "shared", "reveal": "always" }
+    }
+  ]
+}
