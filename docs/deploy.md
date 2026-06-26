@@ -6,8 +6,10 @@
 Browser
   │
   ├─► Vercel          — frontend React (SPA statica, CDN globale)
+  │     URL: https://finance-tracker-six-neon.vercel.app
   │
-  ├─► Fly.io          — backend FastAPI (container, regione mxp - Milano)
+  ├─► Railway         — backend FastAPI (container always-on, regione US West)
+  │     URL: https://finance-tracker-production-a7c5.up.railway.app
   │     └─► Supabase PostgreSQL  (database)
   │
   └─► Supabase Auth   — JWT emessi al login, validati da FastAPI
@@ -15,99 +17,116 @@ Browser
 
 **Flusso di una chiamata:**
 1. Il browser carica i file statici da Vercel (istantaneo, CDN).
-2. Ogni chiamata API va su Fly.io con `Authorization: Bearer <jwt>`.
+2. Ogni chiamata API va su Railway con `Authorization: Bearer <jwt>`.
 3. FastAPI valida il JWT con Supabase (`deps.get_current_user`, cache 60 s) e interroga il DB.
 4. La risposta torna al browser.
 
 ---
 
-## File già presenti nel repo
+## File nel repo necessari al deploy
 
-| File | Stato | Note |
-|---|---|---|
-| `backend/Dockerfile` | ✅ pronto | Python 3.12-slim, porta 8080 |
-| `backend/fly.toml` | ✅ pronto | regione `mxp`, 256 MB RAM, `ENV=production` |
-| `backend/.env.example` | ✅ pronto | template variabili backend |
-| `frontend/.env.example` | ✅ pronto | template variabili frontend |
-| `frontend/vercel.json` | ✅ pronto | rewrite SPA (evita 404 su refresh) |
+| File | Scopo |
+|---|---|
+| `backend/Dockerfile` | Build del container Python per Railway |
+| `backend/fly.toml` | Non usato (rimasto da setup iniziale con Fly.io) |
+| `backend/.env.example` | Template variabili d'ambiente backend |
+| `frontend/.env.example` | Template variabili d'ambiente frontend |
+| `frontend/vercel.json` | Rewrite SPA (evita 404 su refresh di pagina) |
 
 ---
 
-## Passi per il deploy (in ordine)
+## Come è stato fatto il deploy
 
-### 1. Supabase — configurazione redirect URL
+### 1. Railway — backend
 
-Nel dashboard Supabase → **Authentication → URL Configuration**:
-- Aggiungere agli **Allowed Redirect URLs**: `https://<dominio>.vercel.app/reset-password`
+1. Creare account su [railway.app](https://railway.app) con **Login via GitHub** (nessuna carta richiesta, $5 di credito gratuito al mese).
+2. Dashboard → **New Project → GitHub Repository** → selezionare il repo.
+3. Railway rileva automaticamente il repo ma non sa quale cartella buildare. Dopo la creazione del servizio andare in **Settings**:
+   - **Root Directory** → `backend`
+   - **Build method** → `Dockerfile`
+4. Andare in **Variables** e aggiungere:
+   ```
+   SUPABASE_URL    = https://<project>.supabase.co
+   SUPABASE_KEY    = <service-role-key>
+   ALLOWED_ORIGINS = https://<dominio>.vercel.app
+   ```
+   *(aggiornare `ALLOWED_ORIGINS` dopo aver ottenuto il dominio Vercel)*
+5. Railway rideploya automaticamente. Verificare su `https://<railway-url>/health` → deve rispondere `{"status":"ok"}`.
 
-Senza questo il link nell'email di reset password non funziona in produzione.
+> **Nota**: Railway si aggiorna automaticamente ad ogni push su `main`. Non serve CLI né intervento manuale.
 
-### 2. Fly.io — primo deploy backend
+### 2. Vercel — frontend
 
-```bash
-# Installare la CLI se non presente
-# https://fly.io/docs/flyctl/install/
+1. Creare account su [vercel.com](https://vercel.com) con **Login via GitHub** (gratuito, nessuna carta).
+2. **Add New Project → Import** il repo `finance-tracker`.
+3. Nella schermata di configurazione:
+   - **Root Directory** → `frontend`
+   - **Framework** → Vite (rilevato automaticamente)
+   - **Build Command** → `npm run build`
+   - **Output Directory** → `dist`
+4. Aggiungere le **Environment Variables**:
+   ```
+   VITE_SUPABASE_URL      = https://<project>.supabase.co
+   VITE_SUPABASE_ANON_KEY = <anon-key>
+   VITE_API_URL           = https://<railway-url>.up.railway.app
+   ```
+5. Cliccare **Deploy**. Il dominio assegnato è visibile in Overview → Domains.
+6. Tornare su Railway e aggiornare `ALLOWED_ORIGINS` con il dominio Vercel definitivo.
 
-cd backend
+> **Nota**: Vercel rideploya automaticamente ad ogni push su `main`. Non serve CLI né intervento manuale.
 
-# Solo la prima volta: crea l'app su Fly (usa il fly.toml esistente)
-fly launch --no-deploy
+### 3. Supabase — redirect URL per reset password
 
-# Impostare i secrets (non vanno nel fly.toml né nel repo)
-fly secrets set \
-  SUPABASE_URL=https://<project>.supabase.co \
-  SUPABASE_KEY=<service-role-key> \
-  ALLOWED_ORIGINS=https://<dominio>.vercel.app
-
-# Deploy
-fly deploy
+Nel dashboard Supabase → **Authentication → URL Configuration → Allowed Redirect URLs**:
+```
+https://finance-tracker-six-neon.vercel.app/reset-password
 ```
 
-Per i deploy successivi basta `fly deploy` dalla cartella `backend/`.
+---
 
-### 3. Vercel — frontend
+## Aggiornare l'app in futuro
 
-- Collegare il repo GitHub a Vercel (vercel.com → Add New Project).
-- Impostare:
-  - **Root directory**: `frontend`
-  - **Build command**: `npm run build`
-  - **Output directory**: `dist`
-- Aggiungere le **Environment Variables** nel dashboard Vercel:
+Basta fare `git push` sul branch `main`:
+- **Vercel** rideploya il frontend automaticamente.
+- **Railway** rideploya il backend automaticamente.
 
-```
-VITE_SUPABASE_URL      = https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY = <anon-key>
-VITE_API_URL           = https://<app-name>.fly.dev
-```
+Nessuna CLI, nessun intervento manuale.
 
-> `VITE_SUPABASE_ANON_KEY` è la chiave pubblica (anon) — è sicura lato client.
-> `SUPABASE_KEY` sul backend è la *service role* — non esporla mai al browser.
+---
 
-### 4. Smoke test dopo il deploy
+## Variabili d'ambiente — riferimento completo
+
+### Railway (backend)
+| Variabile | Descrizione |
+|---|---|
+| `SUPABASE_URL` | URL del progetto Supabase (`https://<project>.supabase.co`) |
+| `SUPABASE_KEY` | **Service role key** — bypassa RLS, non esporla mai al client |
+| `ALLOWED_ORIGINS` | Dominio Vercel del frontend (CORS) |
+
+### Vercel (frontend)
+| Variabile | Descrizione |
+|---|---|
+| `VITE_SUPABASE_URL` | URL del progetto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | **Anon key** — chiave pubblica, sicura lato client |
+| `VITE_API_URL` | URL del backend Railway |
+
+---
+
+## Smoke test dopo il deploy
 
 - [ ] Login funziona
-- [ ] Una transazione si carica (Network tab → header `Authorization` presente)
-- [ ] Reset password: ricevere email e completare il flusso su `https://<dominio>.vercel.app/reset-password`
+- [ ] Le transazioni si caricano (Network tab → header `Authorization` presente)
+- [ ] Reset password: ricevere email e completare il flusso su `/reset-password`
 - [ ] Importazione di un file CSV va a buon fine
 - [ ] URL sconosciuto mostra la pagina 404 personalizzata
-
----
-
-## Database
-
-Se è un progetto nuovo (DB vuoto), eseguire nel **SQL Editor di Supabase**:
-
-1. [`docs/migration_v2.sql`](./migration_v2.sql) — schema completo (tabelle, indici, seed categorie)
-2. [`docs/migration_soft_delete.sql`](./migration_soft_delete.sql) — colonna `deleted_at` per il soft-delete
-
-Se il DB esiste già dalla fase locale, solo il punto 2 se non ancora eseguito.
+- [ ] Refresh su `/budget` o `/transactions` non dà 404
 
 ---
 
 ## Note operative
 
-- **Regione**: Fly.io in `mxp` (Milano). Scegliere la stessa regione del progetto Supabase per minimizzare la latenza backend → DB.
-- **Cold start**: la configurazione attuale (`auto_stop_machines = true`, `min_machines_running = 0`) spegne la macchina dopo inattività (~5 min). La prima richiesta dopo un periodo di idle impiega ~3–5 s. Per uso personale è accettabile e mantiene il costo a zero su Fly.io free tier. Per evitarlo: impostare `auto_stop_machines = false` e `min_machines_running = 1` (~$2/mese).
-- **Logs**: `fly logs` per i log in tempo reale, `fly status` per lo stato della macchina.
-- **Aggiornamento backend**: `fly deploy` dalla cartella `backend/` dopo ogni modifica.
-- **Aggiornamento frontend**: push su GitHub → Vercel rideploya automaticamente.
+- **Costo**: Railway $5 credito/mese gratuito — per uso personale con traffico minimo è sufficiente. Vercel e Supabase free tier sono illimitati per uso personale.
+- **Logs backend**: Railway dashboard → servizio → **Logs** (in tempo reale).
+- **Logs frontend**: Vercel dashboard → **Deployments → Functions**.
+- **Cold start**: Railway mantiene il container always-on, nessun cold start.
+- **Regione**: Railway US West. Se la latenza verso Supabase fosse un problema, valutare di cambiare regione Railway in modo che coincida con quella del progetto Supabase.
