@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../hooks/useAuth'
 import { errorMessage } from '../utils/errors'
+import { supabase } from '../utils/supabase'
 import { Icon } from '../components/common/Icon'
 import { Input } from '../components/common/Input'
 import { Button } from '../components/common/Button'
@@ -13,11 +14,22 @@ export default function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const [resetSent, setResetSent] = useState(false)
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { isSubmitting },
   } = useForm<Form>()
+
+  const handleForgotPassword = async () => {
+    const email = getValues('email')
+    if (!email) { setError('Inserisci la tua email per ricevere il link di reset'); return }
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setResetSent(true)
+  }
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setError(null)
@@ -59,9 +71,22 @@ export default function Login() {
               {...register('password', { required: true })}
             />
             {error && (
-              <p className="rounded-xl bg-expense/10 border border-expense/20 px-3 py-2 text-sm text-expense">
-                {error}
-              </p>
+              <div className="space-y-2">
+                <p className="rounded-xl bg-expense/10 border border-expense/20 px-3 py-2 text-sm text-expense">
+                  {error}
+                </p>
+                {resetSent ? (
+                  <p className="text-center text-sm text-muted">Email inviata — controlla la casella</p>
+                ) : (
+                  <button
+                    type="button"
+                    className="w-full text-center text-sm text-accent hover:underline"
+                    onClick={handleForgotPassword}
+                  >
+                    Password dimenticata?
+                  </button>
+                )}
+              </div>
             )}
             <Button type="submit" className="w-full justify-center" disabled={isSubmitting}>
               {isSubmitting ? 'Accesso in corso…' : 'Accedi'}

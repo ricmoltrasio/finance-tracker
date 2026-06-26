@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSessionState } from '../hooks/useSessionState'
-import { useTransactions } from '../hooks/useTransactions'
+import { useInfiniteTransactions } from '../hooks/useTransactions'
 import { TransactionList } from '../components/transactions/TransactionList'
 import { MerchantGroupList } from '../components/transactions/MerchantGroupList'
 import { EditDrawer, CreateDrawer } from '../components/transactions/TransactionDrawer'
@@ -8,6 +8,7 @@ import { Icon } from '../components/common/Icon'
 import { CategorySelect } from '../components/common/CategorySelect'
 import { PeriodChip } from '../components/common/PeriodChip'
 import { MobileSheet } from '../components/common/MobileSheet'
+import { Spinner } from '../components/common/Spinner'
 import { useIsMobile } from '../hooks/useIsMobile'
 import type { Transaction } from '../types'
 import { CATEGORIES } from '../types'
@@ -61,25 +62,23 @@ const SORT_FIELDS: { key: SortBy; label: string; defaultDir: 'asc' | 'desc' }[] 
 // ── pagina ────────────────────────────────────────────────────────────────────
 
 export default function Transactions() {
-  const [search, setSearch]         = useSessionState('tx.search', '')
-  const [category, setCategory]     = useSessionState('tx.category', '')
+  const [search, setSearch]               = useSessionState('tx.search', '')
+  const [category, setCategory]           = useSessionState('tx.category', '')
   const [groupMerchants, setGroupMerchants] = useSessionState('tx.group', false)
-  const [period, setPeriod]         = useSessionState<PeriodKey>('tx.period', '3m')
-  const [customFrom, setCustomFrom] = useSessionState('tx.from', '')
-  const [customTo, setCustomTo]     = useSessionState('tx.to', today())
-  const [customMonth, setCustomMonth] = useSessionState('tx.month', '')
-  const [sortBy, setSortBy]         = useSessionState<SortBy>('tx.sortBy', 'date')
-  const [sortDir, setSortDir]       = useSessionState<'asc' | 'desc'>('tx.sortDir', 'desc')
-  const [offset, setOffset]         = useSessionState('tx.offset', 0)
-  const [mobileLimit, setMobileLimit] = useState(PAGE_SIZE)
-  const [selected, setSelected]     = useState<Transaction | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const [period, setPeriod]               = useSessionState<PeriodKey>('tx.period', '3m')
+  const [customFrom, setCustomFrom]       = useSessionState('tx.from', '')
+  const [customTo, setCustomTo]           = useSessionState('tx.to', today())
+  const [customMonth, setCustomMonth]     = useSessionState('tx.month', '')
+  const [sortBy, setSortBy]               = useSessionState<SortBy>('tx.sortBy', 'date')
+  const [sortDir, setSortDir]             = useSessionState<'asc' | 'desc'>('tx.sortDir', 'desc')
+  const [selected, setSelected]           = useState<Transaction | null>(null)
+  const [showCreate, setShowCreate]       = useState(false)
+  const [showFilters, setShowFilters]     = useState(false)
+  const sentinelRef                       = useRef<HTMLDivElement>(null)
 
-  const isMobile = useIsMobile()
+  const isMobile    = useIsMobile()
   const monthOptions = useMemo(() => lastNMonths(), [])
 
-  // numero di filtri attivi (per il badge del bottone "Filtri" su mobile)
   const activeFilters = [
     category !== '',
     groupMerchants,
@@ -87,8 +86,8 @@ export default function Transactions() {
   ].filter(Boolean).length
 
   const range = getRange(period)
-  const from = customFrom || range?.from
-  const to   = customTo   || range?.to
+  const from  = customFrom || range?.from
+  const to    = customTo   || range?.to
 
   const pickSort = (key: SortBy) => {
     if (key === sortBy) {
@@ -97,33 +96,47 @@ export default function Transactions() {
       setSortBy(key)
       setSortDir(SORT_FIELDS.find(f => f.key === key)!.defaultDir)
     }
-    setOffset(0)
   }
 
-  const resetSort = () => {
-    setSortBy('date')
-    setSortDir('desc')
-    setOffset(0)
-  }
+  const resetSort = () => { setSortBy('date'); setSortDir('desc') }
 
-  const params = {
+  const baseParams = {
     search:   search   || undefined,
     category: category || undefined,
     from:     from     || undefined,
     to:       to       || undefined,
     sort_by:  sortBy,
     sort_dir: sortDir,
-    // in modalità "raggruppa esercenti" carichiamo l'intero set filtrato (no paginazione)
-    limit:    groupMerchants ? 500 : (isMobile ? mobileLimit : PAGE_SIZE),
-    offset:   groupMerchants ? 0 : (isMobile ? 0 : offset),
   }
 
-  const { data, isLoading } = useTransactions(params)
-  const total = data?.total ?? 0
-  const pages = Math.ceil(total / PAGE_SIZE)
-  const page  = Math.floor(offset / PAGE_SIZE)
+  // Modalità "raggruppa esercenti" carica tutto in una pagina (500);
+  // altrimenti carica 50 per volta con scroll infinito.
+  const pageSize = groupMerchants ? 500 : PAGE_SIZE
 
-  const resetPage = () => { setOffset(0); setMobileLimit(PAGE_SIZE) }
+  const {
+    data: infiniteData,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteTransactions(baseParams, pageSize)
+
+  const transactions = infiniteData?.pages.flatMap(p => p.data) ?? []
+  const total        = infiniteData?.pages[0]?.total ?? 0
+
+  // Sentinel per lo scroll infinito: quando entra nel viewport carica la pagina successiva.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || groupMerchants) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage()
+      },
+      { rootMargin: '300px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, groupMerchants])
 
   return (
     <>
@@ -143,7 +156,7 @@ export default function Transactions() {
         </header>
 
         {isMobile ? (
-          /* ── mobile: ricerca + bottone Filtri (il resto va nel foglio) ── */
+          /* ── mobile: ricerca + bottone Filtri ── */
           <div className="filterbar">
             <div className="field-icon" style={{ flex: 1 }}>
               <Icon name="search" size={15} />
@@ -152,7 +165,7 @@ export default function Transactions() {
                 type="text"
                 placeholder="Cerca…"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); resetPage() }}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <button className="filter-btn" onClick={() => setShowFilters(true)}>
@@ -172,7 +185,7 @@ export default function Transactions() {
                     role="tab"
                     aria-selected={period === p.key && !customMonth}
                     className={'pill' + (period === p.key && !customMonth ? ' on' : '')}
-                    onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth(''); resetPage() }}
+                    onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth('') }}
                   >
                     {p.label}
                   </button>
@@ -189,7 +202,6 @@ export default function Transactions() {
                     setCustomFrom(r.from)
                     setCustomTo(r.to)
                   }
-                  resetPage()
                 }}
               >
                 <option value="">Mese…</option>
@@ -201,7 +213,7 @@ export default function Transactions() {
               <CategorySelect
                 value={category}
                 options={CATEGORIES}
-                onChange={(v) => { setCategory(v); resetPage() }}
+                onChange={(v) => setCategory(v)}
               />
               <div className="field-icon" style={{ flex: '0 0 auto', width: 210, minWidth: 'auto' }}>
                 <Icon name="search" size={14} />
@@ -211,18 +223,18 @@ export default function Transactions() {
                   placeholder="Cerca per descrizione…"
                   style={{ fontSize: 12.5, padding: '6px 10px 6px 32px', borderRadius: 9 }}
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); resetPage() }}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* riga 2: ordina + categoria + date */}
+            {/* riga 2: ordina + raggruppa + date */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <div className="sortbar" style={{ margin: 0, flex: '0 0 auto' }}>
                 <span className="sortbar-label">Ordina</span>
                 {SORT_FIELDS.map((f) => {
                   const active = f.key === sortBy
-                  const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+                  const arrow  = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
                   return (
                     <button
                       key={f.key}
@@ -249,13 +261,13 @@ export default function Transactions() {
                 className="field field-sm"
                 type="date"
                 value={customFrom || range?.from || ''}
-                onChange={(e) => { setCustomFrom(e.target.value); resetPage() }}
+                onChange={(e) => setCustomFrom(e.target.value)}
               />
               <input
                 className="field field-sm"
                 type="date"
                 value={customTo}
-                onChange={(e) => { setCustomTo(e.target.value); resetPage() }}
+                onChange={(e) => setCustomTo(e.target.value)}
               />
             </div>
           </>
@@ -265,58 +277,28 @@ export default function Transactions() {
         <div className="card" style={{ padding: 8 }}>
           {groupMerchants ? (
             <MerchantGroupList
-              transactions={data?.data ?? []}
+              transactions={transactions}
               loading={isLoading}
               onSelect={(t) => setSelected(t)}
             />
           ) : (
             <TransactionList
-              transactions={data?.data ?? []}
+              transactions={transactions}
               loading={isLoading}
               onSelect={(t) => setSelected(t)}
             />
           )}
         </div>
 
-        {/* paginazione (desktop) / carica altri (mobile) */}
-        {!groupMerchants && total > PAGE_SIZE && (
-          isMobile ? (
-            mobileLimit < total ? (
-              <button
-                className="btn-soft"
-                style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
-                onClick={() => setMobileLimit((l) => l + PAGE_SIZE)}
-              >
-                Carica altri ({Math.min(PAGE_SIZE, total - mobileLimit)} di {total - mobileLimit} rimanenti)
-              </button>
-            ) : null
-          ) : (
-            <div className="pager">
-              <span>
-                {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} di {total}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="pager-btn"
-                  disabled={page === 0}
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  ← Prec
-                </button>
-                <span style={{ color: 'var(--text-2)' }}>
-                  {page + 1} / {pages}
-                </span>
-                <button
-                  className="pager-btn"
-                  disabled={page >= pages - 1}
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                >
-                  Succ →
-                </button>
-              </div>
-            </div>
-          )
+        {/* sentinel invisibile: l'observer lo vede e carica la pagina successiva */}
+        {!groupMerchants && <div ref={sentinelRef} style={{ height: 1 }} />}
+
+        {isFetchingNextPage && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+            <Spinner />
+          </div>
         )}
+
         {isMobile && (
           <button className="fab" aria-label="Aggiungi transazione" onClick={() => setShowCreate(true)}>
             <Icon name="plus" size={24} stroke={2.4} />
@@ -330,7 +312,7 @@ export default function Transactions() {
           <PeriodChip
             options={PERIODS}
             value={period}
-            onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomMonth(''); resetPage() }}
+            onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomMonth('') }}
           />
 
           <div className="sheet-label">Mese specifico</div>
@@ -345,7 +327,6 @@ export default function Transactions() {
                 setCustomFrom(r.from)
                 setCustomTo(r.to)
               }
-              resetPage()
             }}
           >
             <option value="">Nessuno</option>
@@ -358,7 +339,7 @@ export default function Transactions() {
           <CategorySelect
             value={category}
             options={CATEGORIES}
-            onChange={(v) => { setCategory(v); resetPage() }}
+            onChange={(v) => setCategory(v)}
           />
 
           <div className="sheet-label">Intervallo date</div>
@@ -367,13 +348,13 @@ export default function Transactions() {
               className="field"
               type="date"
               value={customFrom || range?.from || ''}
-              onChange={(e) => { setCustomFrom(e.target.value); resetPage() }}
+              onChange={(e) => setCustomFrom(e.target.value)}
             />
             <input
               className="field"
               type="date"
               value={customTo}
-              onChange={(e) => { setCustomTo(e.target.value); resetPage() }}
+              onChange={(e) => setCustomTo(e.target.value)}
             />
           </div>
 
@@ -381,7 +362,7 @@ export default function Transactions() {
           <div className="sortbar" style={{ margin: 0 }}>
             {SORT_FIELDS.map((f) => {
               const active = f.key === sortBy
-              const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+              const arrow  = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
               return (
                 <button
                   key={f.key}

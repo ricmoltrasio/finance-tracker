@@ -1,10 +1,11 @@
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { transactionsApi } from '../api/transactions'
 import type { TransactionCreate, TransactionUpdate } from '../types'
 
 /** Ogni modifica ai movimenti rende stantii anche aggregati e timeline. */
 function invalidateTransactionData(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['transactions'] })
+  qc.invalidateQueries({ queryKey: ['transactions-infinite'] })
   qc.invalidateQueries({ queryKey: ['summary'] })
   qc.invalidateQueries({ queryKey: ['timeline'] })
 }
@@ -13,6 +14,22 @@ export function useTransactions(params: Record<string, string | number | undefin
   return useQuery({
     queryKey: ['transactions', params],
     queryFn: () => transactionsApi.list(params),
+  })
+}
+
+export function useInfiniteTransactions(
+  params: Record<string, string | number | undefined>,
+  pageSize = 50
+) {
+  return useInfiniteQuery({
+    queryKey: ['transactions-infinite', params, pageSize],
+    queryFn: ({ pageParam }) =>
+      transactionsApi.list({ ...params, limit: pageSize, offset: pageParam }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.data.length, 0)
+      return loaded < lastPage.total ? loaded : undefined
+    },
+    initialPageParam: 0,
   })
 }
 

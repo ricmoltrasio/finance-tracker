@@ -4,6 +4,7 @@ import { Sidebar } from './components/layout/Sidebar'
 import { BottomNav } from './components/layout/BottomNav'
 import { Spinner } from './components/common/Spinner'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Overview from './pages/Overview'
 import Transactions from './pages/Transactions'
 import Import from './pages/Import'
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/*" element={<ProtectedLayout />} />
     </Routes>
   )
