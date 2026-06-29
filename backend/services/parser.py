@@ -80,10 +80,29 @@ def map_rows(
 
 # ── internal helpers ──────────────────────────────────────────────────────────
 
+def _find_excel_header_row(file_bytes: bytes) -> int:
+    """Scan up to the first 40 rows to find the header row.
+
+    Returns the index of the first row that has at least 4 non-empty string
+    values — those are the column names. Italian bank exports typically have
+    metadata in the first N rows before the real header.
+    """
+    raw = pd.read_excel(io.BytesIO(file_bytes), dtype=str, header=None, nrows=40)
+    for i in range(len(raw)):
+        vals = [
+            v for v in raw.iloc[i]
+            if isinstance(v, str) and v.strip() not in ('', 'nan', 'None')
+        ]
+        if len(vals) >= 4:
+            return i
+    return 0
+
+
 def _read_file(file_bytes: bytes, filename: str) -> pd.DataFrame:
     ext = filename.rsplit('.', 1)[-1].lower()
     if ext in ('xlsx', 'xls'):
-        return pd.read_excel(io.BytesIO(file_bytes), dtype=str, skiprows=18)
+        header_row = _find_excel_header_row(file_bytes)
+        return pd.read_excel(io.BytesIO(file_bytes), dtype=str, skiprows=header_row)
 
     text = _decode(file_bytes)
     sample = text[:2000]
