@@ -12,7 +12,7 @@ import { Spinner } from '../components/common/Spinner'
 import { useIsMobile } from '../hooks/useIsMobile'
 import type { Transaction } from '../types'
 import { CATEGORIES } from '../types'
-import { iso, lastNMonths, monthRange } from '../utils/period'
+import { isoLocal, lastNMonths, monthRange } from '../utils/period'
 
 const PAGE_SIZE = 50
 
@@ -44,7 +44,7 @@ function getRange(key: PeriodKey): { from: string; to: string } | null {
   } else {
     start = new Date(end.getFullYear(), 0, 1)
   }
-  return { from: iso(start), to: iso(end) }
+  return { from: isoLocal(start), to: isoLocal(end) }
 }
 
 // ── sort ──────────────────────────────────────────────────────────────────────

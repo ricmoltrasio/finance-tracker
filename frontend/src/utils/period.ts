@@ -1,9 +1,20 @@
 // Helper condivisi per la gestione di periodi e intervalli date.
 // Usati da Overview, Transactions e Budget.
 
-/** Data → stringa ISO 'YYYY-MM-DD' */
+/** Data → stringa ISO 'YYYY-MM-DD' (UTC, per date già in UTC). */
 export function iso(d: Date): string {
   return d.toISOString().slice(0, 10)
+}
+
+/** Data → stringa ISO 'YYYY-MM-DD' usando l'ora locale.
+ *  Usare questa quando la Date è costruita con `new Date(y, m, d)` (locale).
+ *  `toISOString()` convertirebbe in UTC e sposterebbe la data indietro nei
+ *  fusi orari ahead of UTC come l'Italia (UTC+1/+2). */
+export function isoLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export function addMonths(d: Date, n: number): Date {
@@ -40,7 +51,7 @@ export function lastNMonths(count = 13): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = []
   for (let i = 0; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    opts.push({ value: iso(d).slice(0, 7), label: monthLabel(d) })
+    opts.push({ value: isoLocal(d).slice(0, 7), label: monthLabel(d) })
   }
   return opts
 }
@@ -53,7 +64,7 @@ export function monthRange(value: string): { from: string; to: string; isCurrent
   const isCurrent = y === now.getFullYear() && m === now.getMonth() + 1
   return {
     from: `${value}-01`,
-    to: isCurrent ? iso(now) : iso(new Date(y, m, 0)),
+    to: isCurrent ? isoLocal(now) : isoLocal(new Date(y, m, 0)),
     isCurrent,
   }
 }

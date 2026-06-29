@@ -13,7 +13,7 @@ import { Spinner } from '../components/common/Spinner'
 import { EditDrawer, CreateDrawer } from '../components/transactions/TransactionDrawer'
 import { useToast } from '../context/ToastContext'
 import { formatEUR, today } from '../utils/format'
-import { iso, addMonths, addDays, prevRange } from '../utils/period'
+import { isoLocal, addMonths, addDays, prevRange } from '../utils/period'
 import { catMeta } from '../types'
 import { Link } from 'react-router-dom'
 import { transactionsApi } from '../api/transactions'
@@ -53,7 +53,7 @@ function getRange(key: PeriodKey): { from: string; to: string; label: string } {
     start = new Date(end.getFullYear(), 0, 1)
     label = String(end.getFullYear())
   }
-  return { from: iso(start), to: iso(end), label }
+  return { from: isoLocal(start), to: isoLocal(end), label }
 }
 
 // ── sotto-componenti ───────────────────────────────────────────────────────────

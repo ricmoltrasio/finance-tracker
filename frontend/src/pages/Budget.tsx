@@ -11,7 +11,7 @@ import { Spinner } from '../components/common/Spinner'
 import { TransactionList } from '../components/transactions/TransactionList'
 import { EditDrawer } from '../components/transactions/TransactionDrawer'
 import { formatEUR } from '../utils/format'
-import { iso, addMonths, addDays, monthLabel, lastNMonths } from '../utils/period'
+import { isoLocal, addMonths, addDays, monthLabel, lastNMonths } from '../utils/period'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { PeriodChip } from '../components/common/PeriodChip'
 
@@ -51,7 +51,7 @@ export default function Budget() {
         const dE = isCurrentM ? end.getDate() : dIM
         return {
           fromStr: `${customMonth}-01`,
-          toStr: isCurrentM ? iso(end) : iso(new Date(y, m, 0)),
+          toStr: isCurrentM ? isoLocal(end) : isoLocal(new Date(y, m, 0)),
           periodDisplay: monthLabel(new Date(y, m - 1, 1)),
           isSingleMonth: true,
           showProjection: isCurrentM,
@@ -66,8 +66,8 @@ export default function Budget() {
 
       if (activePill === 'mese') {
         return {
-          fromStr: iso(new Date(year, month, 1)),
-          toStr: iso(end),
+          fromStr: isoLocal(new Date(year, month, 1)),
+          toStr: isoLocal(end),
           periodDisplay: monthLabel(end),
           isSingleMonth: true,
           showProjection: true,
@@ -78,16 +78,16 @@ export default function Budget() {
       }
 
       if (activePill === '3m')
-        return { fromStr: iso(addDays(addMonths(end, -3), 1)), toStr: iso(end), periodDisplay: 'Ultimi 3 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
+        return { fromStr: isoLocal(addDays(addMonths(end, -3), 1)), toStr: isoLocal(end), periodDisplay: 'Ultimi 3 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
       if (activePill === '6m')
-        return { fromStr: iso(addDays(addMonths(end, -6), 1)), toStr: iso(end), periodDisplay: 'Ultimi 6 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
+        return { fromStr: isoLocal(addDays(addMonths(end, -6), 1)), toStr: isoLocal(end), periodDisplay: 'Ultimi 6 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
       if (activePill === '12m')
-        return { fromStr: iso(addDays(addMonths(end, -12), 1)), toStr: iso(end), periodDisplay: 'Ultimi 12 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
+        return { fromStr: isoLocal(addDays(addMonths(end, -12), 1)), toStr: isoLocal(end), periodDisplay: 'Ultimi 12 mesi', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
 
       // anno
       return {
-        fromStr: iso(new Date(year, 0, 1)),
-        toStr: iso(end),
+        fromStr: isoLocal(new Date(year, 0, 1)),
+        toStr: isoLocal(end),
         periodDisplay: String(year),
         isSingleMonth: false,
         showProjection: false,

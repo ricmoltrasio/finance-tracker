@@ -8,7 +8,8 @@
 
 ALTER TABLE transactions
   ADD COLUMN IF NOT EXISTS tags     TEXT[]  DEFAULT '{}',
-  ADD COLUMN IF NOT EXISTS is_split BOOLEAN DEFAULT FALSE;
+  ADD COLUMN IF NOT EXISTS is_split BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS note     TEXT    DEFAULT '';
 
 -- Assicura che source abbia il constraint corretto
 DO $$
@@ -124,58 +125,23 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created
 
 
 -- ── 8. Seed categorie (fresh — dati ricaricati da zero) ───────────────────────
+-- Le keyword sono lasciate vuote intenzionalmente: il backend le popola
+-- automaticamente al primo GET /categories tramite lazy-seed (HARDCODED_KEYWORDS
+-- in services/categorizer.py), garantendo che siano sempre allineate al codice.
 
 TRUNCATE categories RESTART IDENTITY;
 
 INSERT INTO categories (name, keywords, color, icon, is_income) VALUES
-  ('Cibo',
-   ARRAY['esselunga','conad','lidl','penny','md ','bar ','ristorante','pizzeria','mcdonald','caffe','deliveroo','just eat','glovo'],
-   '#6CBF8E', '🍽️', FALSE),
-
-  ('Auto',
-   ARRAY['benzina','tamoil','eni ','q8','ip ','meccanico','autofficina','gomme','gommista','telepass','autogrill'],
-   '#6C9BCF', '🚗', FALSE),
-
-  ('Salute',
-   ARRAY['farmacia','medico','dentista','studio pizzi','ottico','parafarmacia','creme','dermatologo'],
-   '#A78BFA', '💊', FALSE),
-
-  ('Intrattenimento',
-   ARRAY['cinema','concerto','videogioco','steam','playstation','ticketmaster','eventbrite','ticketone'],
-   '#EF7B7B', '🎮', FALSE),
-
-  ('Abbonamenti',
-   ARRAY['netflix','spotify','amazon prime','google one','claude.ai','apple','disney','adobe'],
-   '#EC4899', '📱', FALSE),
-
-  ('Shopping',
-   ARRAY['amazon','zara','h&m','hm it','zalando','ikea','decathlon','vestiti'],
-   '#F59E0B', '🛍️', FALSE),
-
-  ('Teatro e cinema',
-   ARRAY['teatro'],
-   '#8B5CF6', '🎭', FALSE),
-
-  ('Spostamenti',
-   ARRAY['trenitalia','italo','atm ','uber','flixbus','parcheggio','autostrada','taxi','ncc'],
-   '#14B8A6', '🚇', FALSE),
-
-  ('Viaggi',
-   ARRAY['hotel','booking','airbnb','ryanair','easyjet','voli','vacanza'],
-   '#F97316', '✈️', FALSE),
-
-  ('Altro',
-   ARRAY[]::TEXT[],
-   '#64748B', '🏷️', FALSE),
-
-  ('Stipendio',
-   ARRAY[]::TEXT[],
-   '#10B981', '💰', TRUE),
-
-  ('Contanti',
-   ARRAY['contanti','prelievo'],
-   '#06B6D4', '💵', TRUE),
-
-  ('Rimborsi',
-   ARRAY['rimborso','accredito'],
-   '#84CC16', '📥', TRUE);
+  ('Cibo',            ARRAY[]::TEXT[], '#6CBF8E', '🍽️', FALSE),
+  ('Auto',            ARRAY[]::TEXT[], '#6C9BCF', '🚗', FALSE),
+  ('Salute',          ARRAY[]::TEXT[], '#A78BFA', '💊', FALSE),
+  ('Intrattenimento', ARRAY[]::TEXT[], '#EF7B7B', '🎮', FALSE),
+  ('Abbonamenti',     ARRAY[]::TEXT[], '#EC4899', '📱', FALSE),
+  ('Shopping',        ARRAY[]::TEXT[], '#F59E0B', '🛍️', FALSE),
+  ('Teatro e cinema', ARRAY[]::TEXT[], '#8B5CF6', '🎭', FALSE),
+  ('Spostamenti',     ARRAY[]::TEXT[], '#14B8A6', '🚇', FALSE),
+  ('Viaggi',          ARRAY[]::TEXT[], '#F97316', '✈️', FALSE),
+  ('Altro',           ARRAY[]::TEXT[], '#64748B', '🏷️', FALSE),
+  ('Stipendio',       ARRAY[]::TEXT[], '#10B981', '💰', TRUE),
+  ('Contanti',        ARRAY[]::TEXT[], '#06B6D4', '💵', TRUE),
+  ('Rimborsi',        ARRAY[]::TEXT[], '#84CC16', '📥', TRUE);
