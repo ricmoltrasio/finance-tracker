@@ -89,19 +89,30 @@ async def confirm(
 
     dedup = check_duplicates(rows)
     new_rows = dedup["new"]
-    skipped = len(dedup["duplicates"])
+    dup_rows = dedup["duplicates"]
+    skipped = len(dup_rows)
     errors = 0
-    imported = 0
+    imported_rows: list[dict] = []
 
     if new_rows:
         try:
-            client.table("transactions").insert(new_rows).execute()
-            imported = len(new_rows)
+            result = client.table("transactions").insert(new_rows).execute()
+            imported_rows = result.data or []
         except Exception:
             logger.exception("Insert fallito durante l'import (%d righe)", len(new_rows))
             errors = len(new_rows)
 
-    uncategorized = sum(1 for r in new_rows if r.get("category") == "Altro")
+    imported = len(imported_rows)
+    uncategorized_rows = [r for r in imported_rows if r.get("category") == "Altro"]
+
+    def _slim(r: dict) -> dict:
+        return {
+            "id": r.get("id"),
+            "date": r.get("date", ""),
+            "description": r.get("description", ""),
+            "amount": r.get("amount", 0),
+            "category": r.get("category", ""),
+        }
 
     user_email = getattr(_user, "email", "")
     ip = request.client.host if request.client else ""
@@ -115,8 +126,13 @@ async def confirm(
     return {
         "imported": imported,
         "skipped_duplicates": skipped,
-        "uncategorized": uncategorized,
+        "uncategorized": len(uncategorized_rows),
         "errors": errors,
+        "rows": {
+            "imported": [_slim(r) for r in imported_rows],
+            "duplicates": [_slim(r) for r in dup_rows],
+            "uncategorized": [_slim(r) for r in uncategorized_rows],
+        },
     }
 
 

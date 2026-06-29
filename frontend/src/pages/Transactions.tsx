@@ -12,7 +12,6 @@ import { Spinner } from '../components/common/Spinner'
 import { useIsMobile } from '../hooks/useIsMobile'
 import type { Transaction } from '../types'
 import { CATEGORIES } from '../types'
-import { today } from '../utils/format'
 import { iso, lastNMonths, monthRange } from '../utils/period'
 
 const PAGE_SIZE = 50
@@ -67,7 +66,7 @@ export default function Transactions() {
   const [groupMerchants, setGroupMerchants] = useSessionState('tx.group', false)
   const [period, setPeriod]               = useSessionState<PeriodKey>('tx.period', '3m')
   const [customFrom, setCustomFrom]       = useSessionState('tx.from', '')
-  const [customTo, setCustomTo]           = useSessionState('tx.to', today())
+  const [customTo, setCustomTo]           = useSessionState('tx.to', '')
   const [customMonth, setCustomMonth]     = useSessionState('tx.month', '')
   const [sortBy, setSortBy]               = useSessionState<SortBy>('tx.sortBy', 'date')
   const [sortDir, setSortDir]             = useSessionState<'asc' | 'desc'>('tx.sortDir', 'desc')
@@ -185,7 +184,7 @@ export default function Transactions() {
                     role="tab"
                     aria-selected={period === p.key && !customMonth}
                     className={'pill' + (period === p.key && !customMonth ? ' on' : '')}
-                    onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth('') }}
+                    onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomTo(''); setCustomMonth('') }}
                   >
                     {p.label}
                   </button>
@@ -201,6 +200,9 @@ export default function Transactions() {
                     const r = monthRange(val)
                     setCustomFrom(r.from)
                     setCustomTo(r.to)
+                  } else {
+                    setCustomFrom('')
+                    setCustomTo('')
                   }
                 }}
               >
@@ -312,7 +314,7 @@ export default function Transactions() {
           <PeriodChip
             options={PERIODS}
             value={period}
-            onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomMonth('') }}
+            onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomTo(''); setCustomMonth('') }}
           />
 
           <div className="sheet-label">Mese specifico</div>

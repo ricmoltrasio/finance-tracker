@@ -28,11 +28,24 @@ export interface ImportConfirmBody {
   bank_name?: string
 }
 
+export interface ImportRow {
+  id?: number | null
+  date: string
+  description: string
+  amount: number
+  category: string
+}
+
 export interface ImportResult {
   imported: number
   skipped_duplicates: number
   uncategorized: number
   errors: number
+  rows: {
+    imported: ImportRow[]
+    duplicates: ImportRow[]
+    uncategorized: ImportRow[]
+  }
 }
 
 export const importApi = {

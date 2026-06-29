@@ -22,8 +22,8 @@ export default function Import() {
         </div>
       </header>
 
+      {/* stepper */}
       <div style={{ maxWidth: 700, margin: '0 auto' }}>
-        {/* stepper */}
         <div className="stepper">
           {STEPS.map((s, i) => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -35,21 +35,25 @@ export default function Import() {
             </div>
           ))}
         </div>
+      </div>
 
-        {step === 'upload' && <DropZone onFile={uploadFile} loading={loading} error={error} />}
+      {step === 'upload' && (
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <DropZone onFile={uploadFile} loading={loading} error={error} />
+        </div>
+      )}
 
-        {step === 'mapping' && preview && (
+      {step === 'mapping' && preview && (
+        <div style={{ maxWidth: 700, margin: '0 auto' }}>
           <div className="card">
             <ColumnMapper preview={preview} onConfirm={confirmImport} loading={loading} />
           </div>
-        )}
+        </div>
+      )}
 
-        {step === 'done' && result && (
-          <div className="card">
-            <ImportReport result={result} onReset={reset} />
-          </div>
-        )}
-      </div>
+      {step === 'done' && result && (
+        <ImportReport result={result} onReset={reset} />
+      )}
     </main>
   )
 }

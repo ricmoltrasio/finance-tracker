@@ -1,13 +1,29 @@
 from __future__ import annotations
 
+import re
+import unicodedata
+from collections import Counter
+
 from db.supabase import get_client
+
+
+def _norm(s: str) -> str:
+    """Normalize description for comparison: unicode NFKC, lowercase, collapse whitespace."""
+    s = unicodedata.normalize("NFKC", s)
+    s = s.strip().lower()
+    return re.sub(r"\s+", " ", s)
+
+
+def _key(row: dict) -> tuple:
+    return (row["date"], _norm(row["description"]), round(float(row["amount"]), 2))
 
 
 def check_duplicates(rows: list[dict]) -> dict:
     """Check which rows already exist in the DB.
 
-    Fetches all existing transactions in the date range with a single query,
-    then does O(1) lookups. Also prevents intra-batch duplicates.
+    Fetches all existing transactions in the date range with a single query.
+    Uses a count-aware approach: if the DB has N copies of a key and the CSV
+    has M, only the first N are treated as duplicates and M-N are imported.
 
     Returns: { new: [...], duplicates: [...] }
     """
@@ -29,20 +45,21 @@ def check_duplicates(rows: list[dict]) -> dict:
         .data
     )
 
-    existing_set: set[tuple] = {
-        (r["date"], r["description"].strip().lower(), round(float(r["amount"]), 2))
-        for r in existing_raw
-    }
+    # Count how many of each key already exist in the DB
+    db_counts: dict[tuple, int] = dict(
+        Counter(_key(r) for r in existing_raw)
+    )
 
     new: list[dict] = []
     duplicates: list[dict] = []
 
     for row in rows:
-        key = (row["date"], row["description"].strip().lower(), round(float(row["amount"]), 2))
-        if key in existing_set:
+        k = _key(row)
+        remaining = db_counts.get(k, 0)
+        if remaining > 0:
             duplicates.append(row)
+            db_counts[k] = remaining - 1
         else:
             new.append(row)
-            existing_set.add(key)
 
     return {"new": new, "duplicates": duplicates}
