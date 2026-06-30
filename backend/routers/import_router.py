@@ -13,6 +13,7 @@ from services.audit import log
 from services.categorizer import categorize
 from services.category_keywords import load_db_categories, load_user_rules
 from services.deduplicator import check_duplicates
+from services.geocoder import upsert_merchant_location
 from services.parser import map_rows, parse_file_to_rows
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class ImportConfirmBody(BaseModel):
     col_amount: Optional[str] = None
     col_dare: Optional[str] = None
     col_avere: Optional[str] = None
+    col_location: Optional[str] = None
     raw_rows: list[dict]
     bank_name: Optional[str] = None
     profile_id: Optional[int] = None
@@ -104,6 +106,15 @@ async def confirm(
 
     imported = len(imported_rows)
     uncategorized_rows = [r for r in imported_rows if r.get("category") == "Altro"]
+
+    # Geocodifica da description (stessa colonna già letta, es. "Dettagli" di Intesa)
+    for imported_row in imported_rows:
+        desc = imported_row.get("description", "")
+        if desc:
+            try:
+                upsert_merchant_location(client, desc, desc)
+            except Exception:
+                logger.warning("Geocodifica fallita per '%s'", desc)
 
     def _slim(r: dict) -> dict:
         return {

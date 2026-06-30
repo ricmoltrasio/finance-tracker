@@ -4,26 +4,36 @@ import type { Transaction, TransactionCreate } from '../../types'
 import { CATEGORIES, catMeta } from '../../types'
 import { Icon } from '../common/Icon'
 import { CatGlyph } from '../common/CatGlyph'
-import { formatEUR } from '../../utils/format'
+import { formatEUR, capitalize } from '../../utils/format'
 import {
   useUpdateTransaction,
   useDeleteTransaction,
   useCreateTransaction,
   useSetCategory,
+  useSetLocation,
 } from '../../hooks/useTransactions'
 import { transactionsApi } from '../../api/transactions'
 import { useToast } from '../../context/ToastContext'
+import { errorMessage } from '../../utils/errors'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { SplitForm } from './SplitForm'
 
 const INCOME_CATS = ['Stipendio', 'Contanti', 'Rimborsi']
 
-/** Toggle: limita la categorizzazione alla singola transazione (niente regola/propagazione). */
-function OnlyThisToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+/** Toggle: limita la modifica alla singola transazione (niente regola/propagazione). */
+function OnlyThisToggle({
+  checked,
+  onChange,
+  hint = 'Se attivo, la modifica non viene applicata alle altre transazioni con la stessa descrizione',
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  hint?: string
+}) {
   return (
     <div
       style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 10 }}
-      title="Se attivo, la categoria non viene applicata alle altre transazioni con la stessa descrizione"
+      title={hint}
     >
       <button
         type="button"
@@ -41,6 +51,86 @@ function OnlyThisToggle({ checked, onChange }: { checked: boolean; onChange: (v:
       >
         Applica solo a questa transazione
       </span>
+    </div>
+  )
+}
+
+/** Riepilogo "applica a tutte": lista selezionabile di transazioni con la stessa descrizione. */
+function AffectedTransactionsPanel({
+  message,
+  transactions,
+  selectedIds,
+  onToggle,
+  onCancel,
+  onConfirm,
+  confirmLabel,
+  pending,
+}: {
+  message: React.ReactNode
+  transactions: Transaction[]
+  selectedIds: Set<number>
+  onToggle: (id: number) => void
+  onCancel: () => void
+  onConfirm: () => void
+  confirmLabel: string
+  pending: boolean
+}) {
+  return (
+    <div>
+      <button className="btn-soft" style={{ marginBottom: 16 }} onClick={onCancel}>
+        ← Torna al dettaglio
+      </button>
+      <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14 }}>{message}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '50vh', overflowY: 'auto', marginBottom: 20 }}>
+        {transactions.map((tx) => {
+          const txInc = tx.amount > 0
+          const txD = new Date(tx.date + 'T12:00:00')
+          const checked = selectedIds.has(tx.id)
+          return (
+            <button
+              key={tx.id}
+              onClick={() => onToggle(tx.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 10, fontSize: 13,
+                background: checked ? 'var(--surface-2)' : 'transparent',
+                border: '1px solid ' + (checked ? 'var(--line-2)' : 'transparent'),
+                opacity: checked ? 1 : 0.45,
+                textAlign: 'left', cursor: 'pointer', width: '100%',
+              }}
+            >
+              <span style={{
+                width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                border: '1.5px solid ' + (checked ? 'var(--accent)' : 'var(--line-2)'),
+                background: checked ? 'var(--accent)' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {checked && <Icon name="check" size={11} stroke={2.5} style={{ color: '#06120e' }} />}
+              </span>
+              <span style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                {txD.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}
+              </span>
+              <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tx.description}
+              </span>
+              <span className={'txrow-amt ' + (txInc ? 'in' : 'out')} style={{ fontSize: 13, flexShrink: 0 }}>
+                {formatEUR(tx.amount, { plus: txInc })}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn-soft" onClick={onCancel}>Annulla</button>
+        <button
+          className="btn-accent"
+          style={{ flex: 1, justifyContent: 'center' }}
+          onClick={onConfirm}
+          disabled={pending || selectedIds.size === 0}
+        >
+          {pending ? 'Aggiornamento…' : confirmLabel}
+        </button>
+      </div>
     </div>
   )
 }
@@ -85,13 +175,17 @@ function DrawerShell({
 export function EditDrawer({
   transaction: t,
   onClose,
+  variant = 'overlay',
 }: {
   transaction: Transaction
   onClose: () => void
+  /** 'embedded' renderizza il pannello inline (no scrim, opacità piena) — usato dalla Mappa */
+  variant?: 'overlay' | 'embedded'
 }) {
   const update = useUpdateTransaction()
   const del = useDeleteTransaction()
   const setCat = useSetCategory()
+  const setLoc = useSetLocation()
   const { toast } = useToast()
   const [showSplit, setShowSplit] = useState(false)
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
@@ -102,6 +196,11 @@ export function EditDrawer({
   const [pendingCat, setPendingCat] = useState<{ category: string; affected: Transaction[] } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [cityInput, setCityInput] = useState('')
+  const [onlyThisLoc, setOnlyThisLoc] = useState(false)
+  const [pendingLoc, setPendingLoc] = useState<{ city: string; affected: Transaction[] } | null>(null)
+  const [selectedLocIds, setSelectedLocIds] = useState<Set<number>>(new Set())
+  const [locPreviewLoading, setLocPreviewLoading] = useState(false)
 
   const inc = t.amount > 0
   const d = new Date(t.date + 'T12:00:00')
@@ -144,6 +243,45 @@ export function EditDrawer({
       return next
     })
 
+  const applyLocation = async (city: string, only: boolean, ids?: number[]) => {
+    const clearing = !city.trim()
+    try {
+      const res = await setLoc.mutateAsync({ id: t.id, city, onlyThis: only, ids })
+      const verb = clearing ? 'rimossa' : 'aggiornata'
+      toast(res.updated > 1 ? `Posizione ${verb} (${res.updated} transazioni)` : `Posizione ${verb}`, 'success')
+      setCityInput('')
+    } catch (e) {
+      toast(errorMessage(e, "Errore nell'aggiornamento della posizione"), 'error')
+    }
+    setPendingLoc(null)
+  }
+
+  const pickLocation = async () => {
+    const city = cityInput.trim()
+    if (onlyThisLoc) { applyLocation(city, true); return }
+    setLocPreviewLoading(true)
+    try {
+      const preview = await transactionsApi.setLocation(t.id, city, false, true)
+      if (preview.updated <= 1) {
+        applyLocation(city, false)
+      } else {
+        setPendingLoc({ city, affected: preview.transactions })
+        setSelectedLocIds(new Set(preview.transactions.map((tx) => tx.id)))
+      }
+    } catch (e) {
+      toast(errorMessage(e, 'Errore nel calcolo anteprima'), 'error')
+    } finally {
+      setLocPreviewLoading(false)
+    }
+  }
+
+  const toggleLocId = (id: number) =>
+    setSelectedLocIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+
   const saveAmount = async () => {
     const parsed = parseFloat(amountStr.replace(',', '.'))
     if (isNaN(parsed) || parsed === Math.abs(t.amount)) return
@@ -176,71 +314,50 @@ export function EditDrawer({
     }
   }
 
-  return (
-    <DrawerShell onClose={onClose} title={
-      pendingCat ? 'Riepilogo aggiornamento' :
-      showSplit   ? 'Dividi transazione'     : 'Dettaglio transazione'
-    }>
+  const title =
+    pendingCat ? 'Riepilogo aggiornamento' :
+    pendingLoc ? 'Riepilogo aggiornamento' :
+    showSplit   ? 'Dividi transazione'     : 'Dettaglio transazione'
+
+  const body = (
+    <>
       {pendingCat ? (
-        <div>
-          <button className="btn-soft" style={{ marginBottom: 16 }} onClick={() => setPendingCat(null)}>
-            ← Torna al dettaglio
-          </button>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14 }}>
+        <AffectedTransactionsPanel
+          message={<>
             Aggiornando <strong style={{ color: catMeta(pendingCat.category).color }}>{pendingCat.category}</strong> verranno
             modificate <strong>{pendingCat.affected.length}</strong> transazioni con la stessa descrizione:
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '50vh', overflowY: 'auto', marginBottom: 20 }}>
-            {pendingCat.affected.map((tx) => {
-              const txInc = tx.amount > 0
-              const txD = new Date(tx.date + 'T12:00:00')
-              const checked = selectedIds.has(tx.id)
-              return (
-                <button
-                  key={tx.id}
-                  onClick={() => toggleId(tx.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 10px', borderRadius: 10, fontSize: 13,
-                    background: checked ? 'var(--surface-2)' : 'transparent',
-                    border: '1px solid ' + (checked ? 'var(--line-2)' : 'transparent'),
-                    opacity: checked ? 1 : 0.45,
-                    textAlign: 'left', cursor: 'pointer', width: '100%',
-                  }}
-                >
-                  <span style={{
-                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                    border: '1.5px solid ' + (checked ? 'var(--accent)' : 'var(--line-2)'),
-                    background: checked ? 'var(--accent)' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {checked && <Icon name="check" size={11} stroke={2.5} style={{ color: '#06120e' }} />}
-                  </span>
-                  <span style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                    {txD.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}
-                  </span>
-                  <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {tx.description}
-                  </span>
-                  <span className={'txrow-amt ' + (txInc ? 'in' : 'out')} style={{ fontSize: 13, flexShrink: 0 }}>
-                    {formatEUR(tx.amount, { plus: txInc })}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn-soft" onClick={() => setPendingCat(null)}>Annulla</button>
-            <button
-              className="btn-accent"
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => applyCategory(pendingCat.category, false, [...selectedIds])}
-              disabled={setCat.isPending || selectedIds.size === 0}
-            >
-              {setCat.isPending ? 'Aggiornamento…' : `Conferma (${selectedIds.size})`}
-            </button>
-          </div>
-        </div>
+          </>}
+          transactions={pendingCat.affected}
+          selectedIds={selectedIds}
+          onToggle={toggleId}
+          onCancel={() => setPendingCat(null)}
+          onConfirm={() => applyCategory(pendingCat.category, false, [...selectedIds])}
+          confirmLabel={`Conferma (${selectedIds.size})`}
+          pending={setCat.isPending}
+        />
+      ) : pendingLoc ? (
+        <AffectedTransactionsPanel
+          message={
+            pendingLoc.city ? (
+              <>
+                Impostando la posizione su <strong>{capitalize(pendingLoc.city)}</strong> verranno
+                modificate <strong>{pendingLoc.affected.length}</strong> transazioni con la stessa descrizione:
+              </>
+            ) : (
+              <>
+                Rimuovendo la posizione verranno modificate <strong>{pendingLoc.affected.length}</strong> transazioni
+                con la stessa descrizione:
+              </>
+            )
+          }
+          transactions={pendingLoc.affected}
+          selectedIds={selectedLocIds}
+          onToggle={toggleLocId}
+          onCancel={() => setPendingLoc(null)}
+          onConfirm={() => applyLocation(pendingLoc.city, false, [...selectedLocIds])}
+          confirmLabel={`Conferma (${selectedLocIds.size})`}
+          pending={setLoc.isPending}
+        />
       ) : showSplit ? (
         <div>
           <button
@@ -322,6 +439,36 @@ export function EditDrawer({
                 <OnlyThisToggle checked={onlyThis} onChange={setOnlyThis} />
               </dd>
             </div>
+            <div className="drawer-catrow">
+              <dt>Posizione</dt>
+              <dd>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="field"
+                    type="text"
+                    placeholder={t.city ? 'Lascia vuoto per rimuovere' : 'es. Monza'}
+                    value={cityInput}
+                    style={{ flex: 1 }}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pickLocation() } }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-soft"
+                    onClick={pickLocation}
+                    disabled={(!cityInput.trim() && !t.city) || locPreviewLoading || setLoc.isPending}
+                  >
+                    {locPreviewLoading ? 'Verifica…' : 'Salva'}
+                  </button>
+                </div>
+                {t.city && (
+                  <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6 }}>
+                    Attuale: {capitalize(t.city)}
+                  </p>
+                )}
+                <OnlyThisToggle checked={onlyThisLoc} onChange={setOnlyThisLoc} />
+              </dd>
+            </div>
           </dl>
 
           <label className="drawer-note">
@@ -355,8 +502,24 @@ export function EditDrawer({
           onCancel={() => setShowConfirmDelete(false)}
         />
       )}
-    </DrawerShell>
+    </>
   )
+
+  if (variant === 'embedded') {
+    return (
+      <div className="mappa-sidebar">
+        <div className="mappa-sidebar-header">
+          <span className="drawer-title">{title}</span>
+          <button className="iconbtn" onClick={onClose} aria-label="Chiudi">
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+        <div className="drawer-embedded-body">{body}</div>
+      </div>
+    )
+  }
+
+  return <DrawerShell onClose={onClose} title={title}>{body}</DrawerShell>
 }
 
 // ── create ───────────────────────────────────────────────────────────────────

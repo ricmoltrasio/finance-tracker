@@ -7,7 +7,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from limiter import limiter
-from routers import categories, import_router, settings, transactions
+from routers import categories, import_router, locations, settings, transactions
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -38,6 +38,7 @@ app.include_router(transactions.router)
 app.include_router(settings.router)
 app.include_router(import_router.router)
 app.include_router(categories.router)
+app.include_router(locations.router)
 
 
 @app.get("/health")

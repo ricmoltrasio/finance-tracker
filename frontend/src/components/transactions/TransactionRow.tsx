@@ -30,6 +30,12 @@ export function TransactionRow({ transaction: t, onClick }: Props) {
               <span style={{ color: 'var(--accent)' }}>Divisa</span>
             </>
           )}
+          {t.city && (
+            <>
+              <span className="dot">·</span>
+              <span className="txrow-city">📍 {t.city}</span>
+            </>
+          )}
         </span>
       </div>
       <div className="txrow-right">

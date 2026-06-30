@@ -60,6 +60,18 @@ export function useSetCategory() {
   })
 }
 
+export function useSetLocation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, city, onlyThis, ids }: { id: number; city: string; onlyThis?: boolean; ids?: number[] }) =>
+      transactionsApi.setLocation(id, city, onlyThis, false, ids),
+    onSuccess: () => {
+      invalidateTransactionData(qc)
+      qc.invalidateQueries({ queryKey: ['locations-map'] })
+    },
+  })
+}
+
 export function useDeleteTransaction() {
   const qc = useQueryClient()
   return useMutation({

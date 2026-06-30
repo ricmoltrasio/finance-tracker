@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -11,6 +13,7 @@ from deps import get_current_user
 from limiter import limiter
 from models.transaction import TransactionCreate, TransactionUpdate
 from services.audit import log
+from services.geocoder import geocode_from_location
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -26,6 +29,42 @@ def _date_filter(q, from_date: Optional[date], to_date: Optional[date]):
     if to_date:
         q = q.lte("date", str(to_date))
     return q
+
+
+def _norm_desc(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s).strip().lower()
+    return re.sub(r"\s+", " ", s)
+
+
+def _enrich_with_city(client, rows: list[dict]) -> list[dict]:
+    """Aggiunge il campo `city` a ogni transazione.
+
+    Priorità: override per-transazione (`loc_city`, impostato manualmente
+    dal drawer) su lookup condiviso via merchant_locations.
+    """
+    if not rows:
+        return rows
+    descriptions = list({
+        _norm_desc(r["description"]) for r in rows
+        if r.get("description") and not r.get("loc_city")
+    })
+    city_map: dict[str, str] = {}
+    if descriptions:
+        loc_rows = (
+            client.table("merchant_locations")
+            .select("description,city")
+            .in_("description", descriptions)
+            .execute()
+            .data
+        )
+        city_map = {r["description"]: r["city"] for r in loc_rows if r.get("city")}
+    for row in rows:
+        if row.get("loc_city"):
+            row["city"] = row["loc_city"]
+        else:
+            key = _norm_desc(row.get("description", ""))
+            row["city"] = city_map.get(key)
+    return rows
 
 
 def _get_saldo_iniziale(client) -> float:
@@ -76,7 +115,7 @@ async def list_transactions(
     if search:
         q = q.ilike("description", f"%{search}%")
     result = q.order(sort_by, desc=desc).range(offset, offset + limit - 1).execute()
-    return {"data": result.data, "total": result.count}
+    return {"data": _enrich_with_city(client, result.data), "total": result.count}
 
 
 @router.get("/deleted")
@@ -94,7 +133,7 @@ async def list_deleted_transactions(
         .limit(_ALL_ROWS)
         .execute()
     )
-    return {"data": result.data, "total": len(result.data)}
+    return {"data": _enrich_with_city(client, result.data), "total": len(result.data)}
 
 
 @router.get("/summary")
@@ -318,6 +357,89 @@ async def set_category(
             .is_("deleted_at", "null")
             .execute()
         )
+
+    return {"updated": len(result.data), "transactions": []}
+
+
+class LocationBody(BaseModel):
+    city: Optional[str] = None  # vuoto/assente = rimuove la posizione
+    only_this: bool = False
+    ids: Optional[list[int]] = None  # se presente, aggiorna solo questi ID specifici
+
+
+@router.put("/{transaction_id}/location")
+@limiter.limit("120/minute")
+async def set_location(
+    request: Request,
+    transaction_id: int,
+    body: LocationBody,
+    dry_run: bool = False,
+    _user=Depends(get_current_user),
+):
+    client = get_client()
+
+    tx = (
+        client.table("transactions")
+        .select("description")
+        .eq("id", transaction_id)
+        .is_("deleted_at", "null")
+        .execute()
+    )
+    if not tx.data:
+        raise HTTPException(status_code=404, detail="Transazione non trovata")
+
+    city = (body.city or "").strip()
+    clearing = not city
+
+    if clearing:
+        loc_fields: dict = {"loc_city": None, "loc_lat": None, "loc_lng": None}
+    else:
+        geocoded = geocode_from_location(city)
+        if not geocoded:
+            raise HTTPException(status_code=422, detail=f"Città '{city}' non riconosciuta")
+        loc_fields = {"loc_city": geocoded["city"], "loc_lat": geocoded["lat"], "loc_lng": geocoded["lng"]}
+
+    if body.only_this:
+        if not dry_run:
+            client.table("transactions").update(loc_fields).eq("id", transaction_id).execute()
+        return {"updated": 1, "transactions": []}
+
+    description = tx.data[0]["description"]
+
+    affected = (
+        client.table("transactions")
+        .select("id,date,description,amount,category")
+        .eq("description", description)
+        .is_("deleted_at", "null")
+        .execute()
+    )
+
+    if dry_run:
+        return {"updated": len(affected.data), "transactions": affected.data}
+
+    desc_norm = _norm_desc(description)
+    if clearing:
+        # Rimuove anche la voce condivisa così i futuri import non la ereditano
+        client.table("merchant_locations").delete().eq("description", desc_norm).execute()
+    else:
+        client.table("merchant_locations").upsert(
+            {
+                "description": desc_norm,
+                "city": loc_fields["loc_city"],
+                "lat": loc_fields["loc_lat"],
+                "lng": loc_fields["loc_lng"],
+                "source": "manual",
+            },
+            on_conflict="description",
+        ).execute()
+
+    target_ids = body.ids if body.ids is not None else [r["id"] for r in affected.data]
+    result = (
+        client.table("transactions")
+        .update(loc_fields)
+        .in_("id", target_ids)
+        .execute()
+    )
 
     return {"updated": len(result.data), "transactions": []}
 

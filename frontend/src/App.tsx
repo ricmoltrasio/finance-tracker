@@ -10,6 +10,7 @@ import Transactions from './pages/Transactions'
 import Import from './pages/Import'
 import Settings from './pages/Settings'
 import Budget from './pages/Budget'
+import Mappa from './pages/Mappa'
 import NotFound from './pages/NotFound'
 
 function ProtectedLayout() {
@@ -34,6 +35,7 @@ function ProtectedLayout() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budget" element={<Budget />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/mappa" element={<Mappa />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

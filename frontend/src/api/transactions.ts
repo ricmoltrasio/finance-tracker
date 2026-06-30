@@ -13,6 +13,11 @@ export interface SetCategoryResult {
   transactions: Transaction[]
 }
 
+export interface SetLocationResult {
+  updated: number
+  transactions: Transaction[]
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const p = new URLSearchParams(
     Object.entries(params)
@@ -50,6 +55,12 @@ export const transactionsApi = {
     apiFetch<SetCategoryResult>(`/transactions/${id}/category?dry_run=${dryRun}`, {
       method: 'PATCH',
       body: JSON.stringify({ category, only_this: onlyThis, ids }),
+    }),
+
+  setLocation: (id: number, city: string, onlyThis = false, dryRun = false, ids?: number[]) =>
+    apiFetch<SetLocationResult>(`/transactions/${id}/location?dry_run=${dryRun}`, {
+      method: 'PUT',
+      body: JSON.stringify({ city, only_this: onlyThis, ids }),
     }),
 
   split: (id: number, items: { category: string; amount: number; note: string }[]) =>

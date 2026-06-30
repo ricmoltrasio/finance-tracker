@@ -6,6 +6,7 @@ const NAV = [
   { path: '/', icon: 'overview', label: 'Panoramica' },
   { path: '/transactions', icon: 'list', label: 'Transazioni' },
   { path: '/budget', icon: 'wallet', label: 'Budget' },
+  { path: '/mappa', icon: 'map', label: 'Mappa' },
   { path: '/import', icon: 'upload', label: 'Importa' },
   { path: '/settings', icon: 'settings', label: 'Impostazioni' },
 ]

@@ -188,6 +188,12 @@ const paths: Record<string, ReactNode> = {
       <path d="M16 17l5-5-5-5M21 12H9" />
     </>
   ),
+  map: (
+    <>
+      <path d="M1 6l7-3 8 3 7-3v15l-7 3-8-3-7 3V6Z" />
+      <path d="M8 3v15M16 6v15" />
+    </>
+  ),
 }
 
 export function Icon({ name, size = 18, stroke = 1.75, ...rest }: Props) {

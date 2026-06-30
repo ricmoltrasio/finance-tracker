@@ -9,6 +9,7 @@ export interface Transaction {
   tags: string[]
   is_split: boolean
   deleted_at: string | null
+  city?: string | null
 }
 
 export interface TransactionCreate {
