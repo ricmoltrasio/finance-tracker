@@ -802,7 +802,7 @@ button {
   left: 50%;
   bottom: 30px;
   transform: translate(-50%, 20px);
-  z-index: 80;
+  z-index: 1310; /* sopra a .drawer-scrim (1300) */
   background: #23282f;
   color: var(--text);
   font-size: 13.5px;
@@ -1201,7 +1201,7 @@ textarea.field {
   position: fixed;
   inset: 0;
   background: rgba(5, 7, 10, 0.55);
-  z-index: 60;
+  z-index: 1300; /* sopra ai controlli Leaflet (max 1000) e a .period-pop (1200) */
   backdrop-filter: blur(2px);
   display: flex;
   justify-content: flex-end;
@@ -1823,4 +1823,12 @@ button.mappa-tx-row:hover {
     width: 100%;
     max-height: 300px;
   }
+}
+
+/* dentro al MobileSheet (sotto i 640px) .mappa-sidebar-stats/.mappa-sidebar-list
+   vanno a bordo piena larghezza: annulla il padding laterale di .drawer, che
+   già conta sul padding interno di queste classi (16px) */
+.drawer .mappa-sidebar-stats,
+.drawer .mappa-sidebar-list {
+  margin: 0 -22px;
 }

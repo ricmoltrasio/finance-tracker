@@ -11,11 +11,15 @@ import type { Transaction } from '../types'
 import { catMeta } from '../types'
 import { Spinner } from '../components/common/Spinner'
 import { CatGlyph } from '../components/common/CatGlyph'
+import { Icon } from '../components/common/Icon'
+import { MobileSheet } from '../components/common/MobileSheet'
 import { formatEUR, capitalize } from '../utils/format'
 import { isoLocal, addMonths, lastNMonths, monthRange } from '../utils/period'
 import { PeriodChip } from '../components/common/PeriodChip'
 import type { PeriodOption } from '../components/common/PeriodChip'
 import { EditDrawer } from '../components/transactions/TransactionDrawer'
+import { useIsMobile } from '../hooks/useIsMobile'
+import { useToast } from '../context/ToastContext'
 
 // Fix leaflet default icon path (broken by bundlers)
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -55,11 +59,14 @@ export default function Mappa() {
   const [editTx, setEditTx] = useState<Transaction | null>(null)
   const [enriching, setEnriching] = useState(false)
   const [enrichResult, setEnrichResult] = useState<{ processed: number; enriched: number } | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
   const mapRef = useRef<L.Map | null>(null)
   const clusterRef = useRef<L.MarkerClusterGroup | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
   const monthOptions = lastNMonths()
+  const isMobile = useIsMobile()
+  const { toast } = useToast()
 
   const { from, to } = customMonth ? monthRange(customMonth) : getRange(period)
 
@@ -74,6 +81,9 @@ export default function Mappa() {
     try {
       const res = await locationsApi.enrich()
       setEnrichResult(res)
+      if (isMobile) {
+        toast(`${res.enriched} nuove su ${res.processed} descrizioni`, 'success')
+      }
       qc.invalidateQueries({ queryKey: ['locations-map'] })
     } finally {
       setEnriching(false)
@@ -88,9 +98,10 @@ export default function Mappa() {
       center: [42.5, 12.5],
       zoom: 6,
       zoomControl: true,
+      attributionControl: false,
     })
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap contributors © CARTO',
+      attribution: '',
       maxZoom: 18,
       subdomains: 'abcd',
     }).addTo(map)
@@ -155,33 +166,54 @@ export default function Mappa() {
       {/* header */}
       <div className="mappa-header">
         <h1 className="page-title" style={{ margin: 0 }}>Mappa</h1>
-        <PeriodChip
-          options={PERIODS}
-          value={period}
-          onChange={(k) => { setPeriod(k as PeriodKey); setCustomMonth(''); setSelected(null) }}
-        />
-        <select
-          className={'pill-select' + (customMonth ? ' on' : '')}
-          value={customMonth}
-          onChange={(e) => { setCustomMonth(e.target.value); setSelected(null) }}
-        >
-          <option value="">Mese…</option>
-          {monthOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-        <button
-          className="btn-soft"
-          style={{ marginLeft: 'auto', fontSize: 13 }}
-          onClick={handleEnrich}
-          disabled={enriching}
-        >
-          {enriching ? <><Spinner className="h-3 w-3" /> Arricchimento…</> : '📍 Arricchisci posizioni'}
-        </button>
-        {enrichResult && (
-          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-            {enrichResult.enriched} nuove su {enrichResult.processed} descrizioni
-          </span>
+        {isMobile ? (
+          <>
+            <button
+              className="iconbtn"
+              onClick={handleEnrich}
+              disabled={enriching}
+              aria-label="Arricchisci posizioni"
+              style={{ marginLeft: 'auto' }}
+            >
+              {enriching ? <Spinner className="h-3 w-3" /> : '📍'}
+            </button>
+            <button className="filter-btn" onClick={() => setShowFilters(true)}>
+              <Icon name="grid" size={15} stroke={2} />
+              Filtri
+              {(customMonth || period !== '3m') && <span className="cnt">1</span>}
+            </button>
+          </>
+        ) : (
+          <>
+            <PeriodChip
+              options={PERIODS}
+              value={period}
+              onChange={(k) => { setPeriod(k as PeriodKey); setCustomMonth(''); setSelected(null) }}
+            />
+            <select
+              className={'pill-select' + (customMonth ? ' on' : '')}
+              value={customMonth}
+              onChange={(e) => { setCustomMonth(e.target.value); setSelected(null) }}
+            >
+              <option value="">Mese…</option>
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <button
+              className="btn-soft"
+              style={{ marginLeft: 'auto', fontSize: 13 }}
+              onClick={handleEnrich}
+              disabled={enriching}
+            >
+              {enriching ? <><Spinner className="h-3 w-3" /> Arricchimento…</> : '📍 Arricchisci posizioni'}
+            </button>
+            {enrichResult && (
+              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                {enrichResult.enriched} nuove su {enrichResult.processed} descrizioni
+              </span>
+            )}
+          </>
         )}
       </div>
 
@@ -205,8 +237,8 @@ export default function Mappa() {
           )}
         </div>
 
-        {/* sidebar città selezionata / dettaglio transazione */}
-        {editTx ? (
+        {/* sidebar città selezionata / dettaglio transazione (solo desktop: su mobile diventano sheet) */}
+        {!isMobile && (editTx ? (
           <EditDrawer transaction={editTx} onClose={() => setEditTx(null)} variant="embedded" />
         ) : selected && (
           <div className="mappa-sidebar">
@@ -243,8 +275,79 @@ export default function Mappa() {
                 ))}
             </div>
           </div>
-        )}
+        ))}
       </div>
+
+      {/* mobile: sheet filtri */}
+      {isMobile && showFilters && (
+        <MobileSheet title="Filtri" onClose={() => setShowFilters(false)}>
+          <div className="sheet-label" style={{ marginTop: 4 }}>Periodo</div>
+          <PeriodChip
+            options={PERIODS}
+            value={period}
+            onChange={(k) => { setPeriod(k as PeriodKey); setCustomMonth(''); setSelected(null) }}
+          />
+
+          <div className="sheet-label">Mese specifico</div>
+          <select
+            className="field"
+            value={customMonth}
+            onChange={(e) => { setCustomMonth(e.target.value); setSelected(null) }}
+          >
+            <option value="">Nessuno</option>
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          <button
+            className="btn-accent"
+            style={{ width: '100%', justifyContent: 'center', marginTop: 20 }}
+            onClick={() => setShowFilters(false)}
+          >
+            Mostra mappa
+          </button>
+        </MobileSheet>
+      )}
+
+      {/* mobile: sheet città selezionata */}
+      {isMobile && selected && !editTx && (
+        <MobileSheet title={`📍 ${capitalize(selected.city)}`} onClose={() => setSelected(null)}>
+          <div className="mappa-sidebar-stats">
+            <span>{selected.count} transazioni</span>
+            <span style={{ color: 'var(--red)' }}>{formatEUR(-speseCitta)}</span>
+          </div>
+          <div className="mappa-sidebar-list">
+            {selected.transactions
+              .slice()
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((t) => (
+                <button
+                  key={t.id}
+                  className="mappa-tx-row"
+                  onClick={() => setEditTx(t)}
+                >
+                  <CatGlyph category={t.category} size={30} />
+                  <div className="mappa-tx-info">
+                    <div className="mappa-tx-desc">{t.description}</div>
+                    <div className="mappa-tx-meta">
+                      {formatDate(t.date)} ·{' '}
+                      <span style={{ color: catMeta(t.category).color }}>{t.category}</span>
+                    </div>
+                  </div>
+                  <span className={t.amount < 0 ? 'mappa-tx-out' : 'mappa-tx-in'}>
+                    {formatEUR(t.amount, { plus: t.amount > 0 })}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </MobileSheet>
+      )}
+
+      {/* mobile: drawer modifica transazione, sopra l'eventuale sheet città */}
+      {isMobile && editTx && (
+        <EditDrawer transaction={editTx} onClose={() => setEditTx(null)} />
+      )}
     </main>
   )
 }
