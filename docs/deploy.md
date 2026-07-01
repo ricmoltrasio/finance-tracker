@@ -118,6 +118,8 @@ Nessuna CLI, nessun intervento manuale.
 - [ ] Le transazioni si caricano (Network tab → header `Authorization` presente)
 - [ ] Reset password: ricevere email e completare il flusso su `/reset-password`
 - [ ] Importazione di un file CSV va a buon fine
+- [ ] Mappa si apre, i marker appaiono, click su marker → sidebar/sheet con transazioni
+- [ ] "Arricchisci posizioni" sulla Mappa restituisce un risultato senza errori
 - [ ] URL sconosciuto mostra la pagina 404 personalizzata
 - [ ] Refresh su `/budget` o `/transactions` non dà 404
 
@@ -153,9 +155,11 @@ L'ordine conta: Supabase prima (fornisce le chiavi), poi Railway e Vercel (usano
    - **Project URL** → `https://<codice>.supabase.co`
    - **anon public key** → chiave lunga che inizia con `eyJ...`
    - **service_role key** → altra chiave `eyJ...` (tenerla segreta)
-5. **Creare le tabelle**: andare in **SQL Editor** ed eseguire nell'ordine i due script presenti in `docs/`:
+5. **Creare le tabelle**: andare in **SQL Editor** ed eseguire nell'ordine gli script presenti in `docs/`:
    - `migration_v2.sql` — crea tutte le tabelle e il seed iniziale
    - `migration_soft_delete.sql` — aggiunge il soft delete su transactions
+   - `migration_merchant_locations.sql` — crea la tabella per la geocodifica esercenti (Mappa)
+   - `migration_transaction_location_override.sql` — aggiunge le colonne `loc_city/lat/lng` su transactions (Mappa)
 6. **Configurare l'autenticazione email**: **Authentication → Providers → Email** → assicurarsi che sia abilitato.
 7. **Aggiungere il redirect URL per il reset password**: **Authentication → URL Configuration → Allowed Redirect URLs** → aggiungere:
    ```
@@ -226,6 +230,7 @@ https://<dominio-vercel>.vercel.app/reset-password
 - [ ] Le transazioni si caricano (Network tab → header `Authorization` presente nelle chiamate API)
 - [ ] Importare un file CSV o Excel → va a buon fine
 - [ ] Reset password: richiedere reset → ricevere email → completare il flusso su `/reset-password`
+- [ ] Mappa si apre, "Arricchisci posizioni" funziona senza errori
 - [ ] Refresh su `/budget` o `/transactions` non dà 404
 - [ ] URL sconosciuto mostra la pagina 404 personalizzata
 

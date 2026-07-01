@@ -18,14 +18,15 @@ import { PeriodChip } from '../components/common/PeriodChip'
 const PROJECTION_CATS = ['Cibo', 'Auto']
 
 const PILLS = [
-  { key: 'mese' as const, label: 'Questo mese' },
-  { key: '3m'  as const, label: '3 mesi' },
-  { key: '6m'  as const, label: '6 mesi' },
-  { key: '12m' as const, label: '12 mesi' },
-  { key: 'anno' as const, label: 'Anno' },
+  { key: 'tutto' as const, label: 'Tutto' },
+  { key: 'mese'  as const, label: 'Questo mese' },
+  { key: '3m'    as const, label: '3 mesi' },
+  { key: '6m'    as const, label: '6 mesi' },
+  { key: '12m'   as const, label: '12 mesi' },
+  { key: 'anno'  as const, label: 'Anno' },
 ]
 
-type PillKey = 'mese' | '3m' | '6m' | '12m' | 'anno'
+type PillKey = 'tutto' | 'mese' | '3m' | '6m' | '12m' | 'anno'
 
 export default function Budget() {
   const now = new Date()
@@ -41,8 +42,14 @@ export default function Budget() {
   const monthOptions = useMemo(() => lastNMonths(), [])
 
   const { fromStr, toStr, periodDisplay, isSingleMonth, showProjection, daysElapsed, daysInMonth, daysRemaining } =
-    useMemo(() => {
+    useMemo((): { fromStr: string | undefined; toStr: string | undefined; periodDisplay: string; isSingleMonth: boolean; showProjection: boolean; daysElapsed: number; daysInMonth: number; daysRemaining: number } => {
       const end = new Date()
+
+      if (activePill === 'tutto' && !customMonth) {
+        const dIM = new Date(year, month + 1, 0).getDate()
+        const dE = end.getDate()
+        return { fromStr: undefined, toStr: undefined, periodDisplay: 'Tutto', isSingleMonth: false, showProjection: false, daysElapsed: dE, daysInMonth: dIM, daysRemaining: dIM - dE }
+      }
 
       if (customMonth) {
         const [y, m] = customMonth.split('-').map(Number)
@@ -357,8 +364,8 @@ function CategoryTxDrawer({
   onSelect,
 }: {
   category: string
-  from: string
-  to: string
+  from: string | undefined
+  to: string | undefined
   periodLabel: string
   onClose: () => void
   onSelect: (t: Transaction) => void

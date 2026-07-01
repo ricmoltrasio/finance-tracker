@@ -23,17 +23,19 @@ import { PeriodChip } from '../components/common/PeriodChip'
 
 // ── periodi ──────────────────────────────────────────────────────────────────
 
-type PeriodKey = 'mese' | '3m' | '6m' | '12m' | 'anno'
+type PeriodKey = 'tutto' | 'mese' | '3m' | '6m' | '12m' | 'anno'
 
 const PERIODS: { key: PeriodKey; label: string; granularity: 'day' | 'month' }[] = [
-  { key: 'mese', label: 'Questo mese', granularity: 'day' },
-  { key: '3m',   label: 'Ultimi 3 mesi', granularity: 'day' },
-  { key: '6m',   label: 'Ultimi 6 mesi', granularity: 'day' },
-  { key: '12m',  label: 'Ultimi 12 mesi', granularity: 'month' },
-  { key: 'anno', label: "Quest'anno", granularity: 'month' },
+  { key: 'tutto', label: 'Tutto',          granularity: 'month' },
+  { key: 'mese',  label: 'Questo mese',    granularity: 'day' },
+  { key: '3m',    label: 'Ultimi 3 mesi',  granularity: 'day' },
+  { key: '6m',    label: 'Ultimi 6 mesi',  granularity: 'day' },
+  { key: '12m',   label: 'Ultimi 12 mesi', granularity: 'month' },
+  { key: 'anno',  label: "Quest'anno",     granularity: 'month' },
 ]
 
-function getRange(key: PeriodKey): { from: string; to: string; label: string } {
+function getRange(key: PeriodKey): { from: string; to: string; label: string } | null {
+  if (key === 'tutto') return null
   const end = new Date()
   let start: Date
   let label: string
@@ -328,23 +330,24 @@ export default function Overview() {
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
-  const range = getRange(period)
-  const from = customFrom || range.from
-  const to   = customTo   || range.to
-  const { label } = range
+  const isAll = period === 'tutto'
+  const range = isAll ? null : getRange(period)
+  const from = isAll ? undefined : (customFrom || range!.from)
+  const to   = isAll ? undefined : (customTo   || range!.to)
+  const label = range?.label ?? 'Tutte le transazioni'
   const gran = 'day' as const
-  const prev = prevRange(from, to)
+  const prev = from && to ? prevRange(from, to) : null
 
   const { data: summary, isLoading: loadingSummary } = useSummary(from, to)
-  const { data: prevSummary } = useSummary(prev.from, prev.to)
+  const { data: prevSummary } = useSummary(prev?.from, prev?.to)
   const { data: timeline, isLoading: loadingTimeline } = useTimeline(from, to, gran)
   const { data: recentData } = useTransactions({ from, to, limit: 8, offset: 0 })
 
   const spese = summary?.spese_totali ?? 0
   const entrate = summary?.entrate_totali ?? 0
   const netto = entrate - spese
-  const prevSpese = prevSummary?.spese_totali ?? 0
-  const prevEntrate = prevSummary?.entrate_totali ?? 0
+  const prevSpese = prev ? (prevSummary?.spese_totali ?? 0) : 0
+  const prevEntrate = prev ? (prevSummary?.entrate_totali ?? 0) : 0
   const prevNetto = prevEntrate - prevSpese
 
   const endBalance =
@@ -364,8 +367,9 @@ export default function Overview() {
     return list.slice(0, 8)
   }, [recentData])
 
-  // bar chart granularity: weekly up to 6 months, monthly beyond
+  // bar chart granularity: weekly up to 6 months, monthly beyond; 'tutto' → always month
   const rangeDays = useMemo(() => {
+    if (!from || !to) return 9999
     try {
       return Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000)
     } catch { return 90 }
@@ -482,7 +486,7 @@ export default function Overview() {
               className="field"
               type="date"
               style={{ width: 140 }}
-              value={customFrom || range.from}
+              value={customFrom || range?.from || ''}
               onChange={(e) => setCustomFrom(e.target.value)}
             />
             <input

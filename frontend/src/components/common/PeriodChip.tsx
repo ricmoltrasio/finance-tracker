@@ -6,17 +6,20 @@ export interface PeriodOption {
   label: string
 }
 
-/** Selettore periodo collassato (mobile): un chip che mostra il periodo attivo
- *  e al tap apre un popover con le opzioni. Sostituisce la fila di pill su
- *  schermi piccoli; sul desktop si continua a usare la `.periodbar`. */
+/** Selettore periodo.
+ *  - Default: chip collassato con popover (usato nell'header su mobile).
+ *  - `inline`: griglia di pill tutte visibili (usato dentro MobileSheet,
+ *    dove il popover absolute verrebbe clippato dall'overflow del drawer). */
 export function PeriodChip({
   options,
   value,
   onChange,
+  inline = false,
 }: {
   options: PeriodOption[]
   value: string
   onChange: (key: string) => void
+  inline?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -36,6 +39,23 @@ export function PeriodChip({
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  if (inline) {
+    return (
+      <div className="period-pills">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            className={'period-pill' + (value === o.key ? ' on' : '')}
+            onClick={() => onChange(o.key)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   const current = options.find((o) => o.key === value)?.label ?? '—'
 

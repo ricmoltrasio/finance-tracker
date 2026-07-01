@@ -7,42 +7,46 @@ Database: **PostgreSQL** (Supabase). L'autenticazione è gestita da Supabase Aut
 ## Diagramma relazioni
 
 ```
-                       ┌────────────────────┐
-                       │    transactions    │
-                       │────────────────────│
-                       │ id            PK    │
-                       │ date                │
-                       │ description         │
-                       │ amount              │
-                       │ category            │◄──── (valore testuale, match per nome con categories.name)
-                       │ source              │
-                       │ note                │
-                       │ tags  TEXT[]        │
-                       │ is_split            │
-                       └─────────┬──────────┘
-                                 │ 1
-                                 │
-                                 │ N
-                       ┌─────────▼──────────┐
-                       │    split_items     │
-                       │────────────────────│
-                       │ id            PK    │
-                       │ transaction_id FK   │──► transactions.id  (ON DELETE CASCADE)
-                       │ category            │
-                       │ amount              │
-                       │ note                │
-                       └────────────────────┘
+                       ┌──────────────────────────┐
+                       │       transactions        │
+                       │──────────────────────────│
+                       │ id              PK        │
+                       │ date                      │
+                       │ description               │◄──── normalizzata → lookup merchant_locations
+                       │ amount                    │
+                       │ category                  │◄──── match logico con categories.name
+                       │ source                    │
+                       │ note                      │
+                       │ tags  TEXT[]              │
+                       │ is_split                  │
+                       │ deleted_at                │      soft delete
+                       │ loc_city                  │ ─┐
+                       │ loc_lat                   │  │  override posizione per-transazione
+                       │ loc_lng                   │ ─┘  (priorità su merchant_locations)
+                       └──────────┬────────────────┘
+                                  │ 1
+                                  │
+                                  │ N
+                       ┌──────────▼────────────────┐
+                       │        split_items         │
+                       │──────────────────────────  │
+                       │ id              PK         │
+                       │ transaction_id  FK         │──► transactions.id  (ON DELETE CASCADE)
+                       │ category                   │
+                       │ amount                     │
+                       │ note                       │
+                       └────────────────────────────┘
 
-   ┌──────────────┐   ┌────────────────┐   ┌──────────────┐
-   │  categories  │   │ import_profiles│   │   settings   │
-   └──────────────┘   └────────────────┘   └──────────────┘
+   ┌──────────────┐   ┌────────────────────┐   ┌──────────────┐
+   │  categories  │   │  import_profiles   │   │   settings   │
+   └──────────────┘   └────────────────────┘   └──────────────┘
 
-   ┌──────────────┐   ┌──────────────┐
-   │  user_rules  │   │  audit_log   │
-   └──────────────┘   └──────────────┘
+   ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐
+   │  user_rules  │   │  audit_log   │   │  merchant_locations  │
+   └──────────────┘   └──────────────┘   └──────────────────────┘
 ```
 
-> **Nota sulle relazioni**: l'unica foreign key reale è `split_items.transaction_id → transactions.id`. Il collegamento tra `transactions.category` e `categories.name` è *logico* (per nome), non vincolato da FK — questo permette di avere categorie testuali anche non presenti in tabella (es. `Altro`, `Stipendio`).
+> **Nota sulle relazioni**: l'unica foreign key reale è `split_items.transaction_id → transactions.id`. Il collegamento tra `transactions.category` e `categories.name` è *logico* (per nome), non vincolato da FK. Il collegamento tra `transactions.description` e `merchant_locations.description` è anch'esso logico (normalizzazione: strip + lower + collapse spaces).
 
 ---
 
@@ -62,11 +66,41 @@ Movimenti finanziari. È la tabella centrale.
 | `note` | TEXT | Nota libera |
 | `tags` | TEXT[] | Default `{}` |
 | `is_split` | BOOLEAN | Default `FALSE`; `TRUE` se suddivisa in `split_items` |
+| `deleted_at` | TIMESTAMPTZ | Default `NULL`; valorizzato dal soft-delete (la riga non viene rimossa fisicamente) |
+| `loc_city` | TEXT | Override posizione per questa transazione; `NULL` = usa `merchant_locations` |
+| `loc_lat` | NUMERIC | Latitudine override (valorizzato insieme a `loc_city`) |
+| `loc_lng` | NUMERIC | Longitudine override (valorizzato insieme a `loc_city`) |
 
 **Indici**
 - `idx_transactions_date` su `(date)`
 - `idx_transactions_category` su `(category)`
 - `idx_transactions_date_amount` su `(date, amount)`
+- `idx_transactions_deleted_at` su `(deleted_at) WHERE deleted_at IS NOT NULL` (partial index)
+
+**Migration**: `migration_v2.sql` + `migration_soft_delete.sql` + `migration_transaction_location_override.sql`
+
+---
+
+### `merchant_locations`
+Lookup posizione per esercente (descrizione normalizzata → coordinate). Popolata automaticamente al momento dell'import e tramite `POST /locations/enrich`. La correzione manuale da drawer imposta `source='manual'`.
+
+| Colonna | Tipo | Note |
+|---|---|---|
+| `id` | BIGSERIAL | PK |
+| `description` | TEXT | **UNIQUE**, NOT NULL — descrizione normalizzata (strip + lower + collapse spaces) |
+| `city` | TEXT | Nome città (lowercase) |
+| `country` | TEXT | Default `'IT'` |
+| `lat` | NUMERIC | Latitudine (centroide comune da gazetteer o Nominatim) |
+| `lng` | NUMERIC | Longitudine |
+| `source` | TEXT | Default `'auto'` — CHECK in (`auto`, `manual`). `'manual'` blocca la sovrascrittura automatica |
+| `resolved_at` | TIMESTAMPTZ | Riservato per precisione POI via Overpass (non ancora usato) |
+| `created_at` | TIMESTAMPTZ | Default `NOW()` |
+
+**Indici**: `idx_merchant_locations_description` su `(description)`.
+
+**Priorità posizione**: se `transactions.loc_city` è valorizzato, ha la precedenza su `merchant_locations`. Questo permette di correggere la posizione di una singola transazione (o di un gruppo con `only_this=false`) senza alterare il lookup condiviso.
+
+**Migration**: `migration_merchant_locations.sql`
 
 ---
 
@@ -168,7 +202,10 @@ Traccia delle azioni sensibili. Scrittura best-effort (non blocca mai il flusso 
 ## Convenzioni e regole applicative (non vincolate da constraint DB)
 
 - **Segno importo**: uscite negative, entrate positive. `summary` e `timeline` distinguono per segno.
+- **Soft delete**: le transazioni eliminate non vengono rimosse fisicamente — viene impostato `deleted_at`. Tutte le query applicative filtrano `WHERE deleted_at IS NULL`. Il deduplicatore confronta anche con le righe soft-deleted per prevenire re-import.
 - **Soglia stipendio**: importi `> 600` sono categorizzati come `Stipendio` indipendentemente dalla descrizione.
 - **Deduplicazione**: identità di un movimento = `(date, lower(trim(description)), round(amount, 2))`.
 - **Budget**: valorizzato solo sulle categorie di uscita; le proiezioni di fine mese sono calcolate lato frontend solo per `Cibo` e `Auto`.
-- **Categorie testuali**: `transactions.category` può contenere nomi non presenti in `categories` (es. `Altro`), per questo non esiste una FK.
+- **Categorie testuali**: `transactions.category` può contenere nomi non presenti in `categories` (es. `Altro`, `Stipendio`), per questo non esiste una FK.
+- **Priorità posizione**: `transactions.loc_city` (override per-transazione, impostato dalla correzione manuale nel drawer) ha priorità su `merchant_locations` (lookup per esercente). Se entrambi sono assenti la transazione non compare sulla mappa.
+- **Geocodifica per esercente**: `merchant_locations.source='manual'` protegge dalla sovrascrittura automatica. Una descrizione già presente (qualunque `source`) non viene riprocessata da `POST /locations/enrich` — usare `docs/reset_locations.sql` per forzare un ricalcolo completo.

@@ -312,6 +312,7 @@ export default function Transactions() {
         <MobileSheet title="Filtri" onClose={() => setShowFilters(false)}>
           <div className="sheet-label" style={{ marginTop: 4 }}>Periodo</div>
           <PeriodChip
+            inline
             options={PERIODS}
             value={period}
             onChange={(k) => { setPeriod(k as typeof period); setCustomFrom(''); setCustomTo(''); setCustomMonth('') }}
@@ -338,11 +339,16 @@ export default function Transactions() {
           </select>
 
           <div className="sheet-label">Categoria</div>
-          <CategorySelect
+          <select
+            className="field"
             value={category}
-            options={CATEGORIES}
-            onChange={(v) => setCategory(v)}
-          />
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Tutte le categorie</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
 
           <div className="sheet-label">Intervallo date</div>
           <div style={{ display: 'flex', gap: 8 }}>

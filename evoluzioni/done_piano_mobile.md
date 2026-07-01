@@ -1,13 +1,39 @@
 # Piano — Versione mobile
 
-**Stato:** progettato, non implementato.
+**Stato:** parzialmente implementato (infrastruttura + Transazioni + Mappa ✅; Panoramica, Budget, Importazione, Impostazioni ❌).
 **Data progettazione:** giugno 2026.
+**Data implementazione parziale:** giugno–luglio 2026.
 
 Riprogettazione mirata delle schermate per l'uso touch su telefono. Non un semplice responsive: le aree dense vengono ripensate per scorrimento fluido, uso a una mano e target tattili adeguati. **Nessuna perdita di funzionalità** e **zero impatto sul desktop** (codice e resa attuali invariati).
 
 ---
 
-## Stato attuale (da cosa partiamo)
+## Cosa è stato implementato
+
+### ✅ Infrastruttura (completa)
+- Hook `useIsMobile()` (`hooks/useIsMobile.ts`) — breakpoint `(max-width: 640px)` via `matchMedia`, reattivo al resize.
+- `MobileSheet` (`components/common/MobileSheet.tsx`) — bottom sheet generico che riusa `.drawer`/`.drawer-scrim` già ri-stilati come foglio dal basso a ≤640px (drag handle, scrim, animazione `sheetUp`, safe-area).
+- CSS scoped a `@media (max-width: 640px)` in `index.css`: sizing tattile (`min-height: 44px` su pill/chip), `.fab` con `safe-area-inset-bottom`, `.drawer → bottom sheet` transform.
+- Z-index aggiornati per coesistenza con Leaflet: `.drawer-scrim` a 1300, toast a 1320 (sopra ai controlli Leaflet max 1000 e a `.period-pop` 1200).
+
+### ✅ Transazioni (completa)
+- Header mobile: campo ricerca full-width + bottone "Filtri" con badge contatore filtri attivi.
+- Foglio "Filtri" (`MobileSheet`): periodo come **griglia di pill 2-colonne** (nessun dropdown, evita il problema di overflow clipping del drawer) + mese specifico + categoria (select nativo, mai fuori schermo) + intervallo date + ordinamento + toggle raggruppa esercenti + "Mostra risultati".
+- Scroll infinito (`useInfiniteQuery`) al posto della paginazione a bottoni.
+- FAB "Aggiungi" in basso a destra (sopra la bottom nav).
+- Drawer dettaglio/nuova transazione → bottom sheet automaticamente a ≤640px via CSS.
+
+### ✅ Mappa (completa)
+- Header mobile compatto: titolo + bottone icona "📍" (arricchisci) + bottone "Filtri" con badge.
+- Foglio "Filtri" Mappa: periodo in griglia pill 2-colonne + mese specifico + "Mostra mappa".
+- Sidebar città selezionata → `MobileSheet` bottom sheet (con statistiche città e lista transazioni, classi interne riusate).
+- EditDrawer in overlay (variant default, bottom sheet automatico) su mobile invece di embedded.
+- Tooltip marker permanenti su mobile (non richiedono hover).
+- `PeriodChip` aggiornato con prop `inline` per la modalità pill-grid inside sheet.
+
+---
+
+## Stato attuale (da cosa partiamo — contesto storico)
 
 Esiste già un adattamento responsive minimo a `@media (max-width: 860px)`:
 - la `Sidebar` sparisce e compare la `BottomNav` (5 voci: Home · Movimenti · Budget · Importa · Settings);

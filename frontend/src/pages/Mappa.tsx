@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -29,17 +29,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
 
-type PeriodKey = 'mese' | '3m' | '6m' | '12m' | 'anno'
+type PeriodKey = 'tutto' | 'mese' | '3m' | '6m' | '12m' | 'anno'
 
 const PERIODS: PeriodOption[] = [
+  { key: 'tutto', label: 'Tutto' },
   { key: 'mese', label: 'Questo mese' },
   { key: '3m', label: 'Ultimi 3 mesi' },
   { key: '6m', label: 'Ultimi 6 mesi' },
   { key: '12m', label: 'Ultimi 12 mesi' },
-  { key: 'anno', label: 'Quest’anno' },
+  { key: 'anno', label: "Quest'anno" },
 ]
 
-function getRange(period: PeriodKey): { from: string; to: string } {
+function getRange(period: PeriodKey): { from: string; to: string } | null {
+  if (period === 'tutto') return null
   const now = new Date()
   const to = isoLocal(now)
   if (period === 'mese') {
@@ -68,7 +70,9 @@ export default function Mappa() {
   const isMobile = useIsMobile()
   const { toast } = useToast()
 
-  const { from, to } = customMonth ? monthRange(customMonth) : getRange(period)
+  const range = customMonth ? monthRange(customMonth) : getRange(period)
+  const from = range?.from
+  const to = range?.to
 
   const { data: points, isLoading } = useQuery({
     queryKey: ['locations-map', from, to],
@@ -146,7 +150,7 @@ export default function Mappa() {
       const spese = pt.transactions.filter((t) => t.amount < 0)
       const totaleSpese = spese.reduce((s, t) => s + Math.abs(t.amount), 0)
       marker.bindTooltip(`<strong>${capitalize(pt.city)}</strong><br/>${formatEUR(-totaleSpese)}`, {
-        permanent: false,
+        permanent: isMobile,
         direction: 'top',
       })
       marker.on('click', () => setSelected(pt))
@@ -155,7 +159,7 @@ export default function Mappa() {
 
     map.addLayer(cluster)
     clusterRef.current = cluster
-  }, [points])
+  }, [points, isMobile])
 
   const speseCitta = selected
     ? selected.transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
@@ -283,6 +287,7 @@ export default function Mappa() {
         <MobileSheet title="Filtri" onClose={() => setShowFilters(false)}>
           <div className="sheet-label" style={{ marginTop: 4 }}>Periodo</div>
           <PeriodChip
+            inline
             options={PERIODS}
             value={period}
             onChange={(k) => { setPeriod(k as PeriodKey); setCustomMonth(''); setSelected(null) }}

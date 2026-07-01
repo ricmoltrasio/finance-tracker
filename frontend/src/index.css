@@ -1560,6 +1560,40 @@ textarea.field {
   font-weight: 600;
 }
 
+/* periodo come griglia di pill visibili (dentro MobileSheet, evita popup clippato dal drawer) */
+.period-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.period-pill {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+}
+.period-pill.on {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface));
+  font-weight: 600;
+}
+/* se il numero di pill è dispari l'ultima occupa tutta la riga */
+.period-pills .period-pill:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 /* barra ricerca + bottone Filtri (Transazioni mobile) */
 .filterbar {
   display: flex;
