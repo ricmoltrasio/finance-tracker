@@ -113,9 +113,13 @@ BUDGET — Costi ricorrenti (competenza)
 2. **Fase 2** — generazione assistita (`pending` + conferma). Risolve l'Esigenza 2 ("non inserirle a mano").
 3. **Fase 3** — pannello ammortamento nel Budget. Risolve l'Esigenza 1 (spalmatura annuale).
 
-### Decisioni ancora aperte
+### Decisioni prese (luglio 2026)
 
-- `source` delle transazioni generate: nuovo valore `'ricorrente'` (più pulito per filtrare) vs riuso `'manuale'` (nessuna migration sul constraint).
-- Generazione: conferma manuale (default consigliato) vs automatica.
-- Dove vive la gestione ricorrenze: sezione in Impostazioni vs pagina dedicata in navigazione.
-- Frequenze supportate: per ora `monthly`/`yearly`; eventuale `quarterly`/`weekly` in futuro.
+- **`source = 'ricorrente'`** (nuovo valore, non riuso di `'manuale'`): la migration sul CHECK constraint è banale e poter filtrare le transazioni generate per source servirà (report, esclusioni, debug). Nella stessa migration conviene aggiungere al CHECK anche `'trasferimento'`, già previsto dal piano multi-conto (`altri_conti.md`) — una migration sola invece di due.
+- **Generazione: conferma manuale** (lista "Da registrare" + Conferma/Salta). L'automatica al login resta una variante futura.
+- **Gestione ricorrenze in Impostazioni** (sezione accanto alle categorie): non merita una voce di navigazione dedicata.
+- **Frequenze: solo `monthly`/`yearly`** per ora; `quarterly`/`weekly` solo se emerge il bisogno.
+
+### Compatibilità con il piano multi-conto (`altri_conti.md`)
+
+Nessuna dipendenza bloccante: quando esisterà `transactions.account_id` (nullable), le transazioni generate dalle ricorrenze dovranno solo ereditare un `account_id` (campo opzionale sulla tabella `recurring`, aggiungibile in quel momento). L'unico punto di contatto reale è il CHECK constraint su `source` (vedi sopra).

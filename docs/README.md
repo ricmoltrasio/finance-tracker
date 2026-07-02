@@ -48,6 +48,9 @@ Breakpoint `@media (max-width: 640px)` separato dall'attuale `860px` (sidebar→
 - `MobileSheet` — componente bottom sheet che riusa `.drawer`/`.drawer-scrim` (già ri-stilati come foglio dal basso a ≤640px) con drag handle, scrim e animazione `sheetUp`.
 - I drawer laterali diventano automaticamente bottom sheet a ≤640px via CSS, senza modifiche JS.
 - Le pagine **Transazioni** e **Mappa** hanno un foglio "Filtri" dedicato (filtri collassati dietro un pulsante, si aprono come bottom sheet) per non coprire il contenuto principale con i controlli.
+- **Panoramica** e **Budget** usano il selettore periodo collassato `PeriodChip` (chip + popover) al posto della fila di pill; KPI reimpaginati a griglia (2+1).
+- I grafici (`SaldoChart`, `SpendingBars`) hanno handler touch additivi rispetto a quelli mouse; su mobile il pin-multiplo delle categorie in Panoramica è disattivato (resta il drill singolo al tap).
+- **Importazione**: anteprima tabella con scroll orizzontale isolato; nel report il dettaglio delle righe si apre in un `MobileSheet`.
 
 ---
 

@@ -1,8 +1,8 @@
 # Piano — Versione mobile
 
-**Stato:** parzialmente implementato (infrastruttura + Transazioni + Mappa ✅; Panoramica, Budget, Importazione, Impostazioni ❌).
+**Stato:** implementato (tutte le schermate ✅; residua solo la verifica sistematica su dispositivi reali).
 **Data progettazione:** giugno 2026.
-**Data implementazione parziale:** giugno–luglio 2026.
+**Data implementazione:** giugno–luglio 2026.
 
 Riprogettazione mirata delle schermate per l'uso touch su telefono. Non un semplice responsive: le aree dense vengono ripensate per scorrimento fluido, uso a una mano e target tattili adeguati. **Nessuna perdita di funzionalità** e **zero impatto sul desktop** (codice e resa attuali invariati).
 
@@ -30,6 +30,24 @@ Riprogettazione mirata delle schermate per l'uso touch su telefono. Non un sempl
 - EditDrawer in overlay (variant default, bottom sheet automatico) su mobile invece di embedded.
 - Tooltip marker permanenti su mobile (non richiedono hover).
 - `PeriodChip` aggiornato con prop `inline` per la modalità pill-grid inside sheet.
+
+### ✅ Panoramica (completa)
+- Selettore periodo collassato: `PeriodChip` (chip + popover) al posto di pill + date picker; il ramo desktop resta invariato.
+- KPI in griglia **2+1** via CSS (`.kpis` a 2 colonne, ultima card a piena larghezza).
+- Grafici touch: `SaldoChart` e `SpendingBars` con `onTouchStart/Move/End` **additivi** rispetto agli handler mouse (desktop bit-per-bit invariato), `preventDefault` per evitare lo scroll durante il drag sul grafico.
+- Breakdown categorie: su mobile il pin-multiplo è disattivato (`hidePins`), resta il drill singolo al tap — come da decisione del piano.
+
+### ✅ Budget (completa)
+- `PeriodChip` su mobile al posto di pill + dropdown mese.
+- KPI in griglia 2 colonne con la terza card a piena larghezza (`gridColumn: 1 / -1`).
+- Drill categoria (`CategoryTxDrawer`) → bottom sheet automatico via CSS `.drawer` a ≤640px.
+
+### ✅ Importazione (completa)
+- Anteprima tabella del `ColumnMapper` con **scroll-x isolato** (scelta tra le due opzioni del piano; la vista a card riga-per-riga non è servita).
+- `ImportReport`: su mobile layout a 1 colonna; tap su una stat card apre il dettaglio delle righe in un `MobileSheet`.
+
+### ✅ Impostazioni (completa)
+- Solo sizing via CSS come previsto: `.cat-acc-head` min-height 56px, `.field` 44px con font 16px (anti-zoom iOS al focus).
 
 ---
 
@@ -203,14 +221,16 @@ Stima in giornate-uomo (sviluppo + rifinitura), per un dev che conosce il codice
 
 ---
 
-## Decisioni aperte
+## Decisioni — tutte risolte in implementazione
 
-- **Una sola codebase responsive** (hook + media query) **vs** un set di componenti `*.mobile.tsx` separati. Raccomandato: responsive con hook (meno duplicazione, desktop garantito invariato), componenti separati solo dove la struttura diverge molto (filtri Transazioni).
-- **Pin-multiplo categorie** nella Panoramica: semplificare a drill singolo su mobile (consigliato) o replicarlo con una UI tattile dedicata.
-- **Anteprima import**: scroll-x della tabella vs vista a card riga-per-riga.
-- **Scroll infinito vs "carica altro"** a bottone: l'infinito è più fluido, il bottone più controllabile.
-- Breakpoint telefono: 640px proposto; valutare 600/680 sui dispositivi reali.
+- **Una sola codebase responsive** (hook + media query): scelta confermata. Nessun componente `*.mobile.tsx`; rami `isMobile` inline nelle pagine, componenti mobile-only solo dove serviva (`MobileSheet`, foglio Filtri, `PeriodChip`).
+- **Pin-multiplo categorie** nella Panoramica: semplificato a drill singolo su mobile (`hidePins`), come raccomandato.
+- **Anteprima import**: scroll-x della tabella (la vista a card non è servita).
+- **Scroll infinito** (non "carica altro"): implementato con `useInfiniteQuery`.
+- **Breakpoint telefono**: 640px confermato.
+- **Drill categoria → dettaglio transazione: bottom sheet IMPILATO.** Il dettaglio si apre sopra la lista; chiudendolo si torna alla lista della categoria.
+- **Selettore periodo collassato: POPOVER** (`PeriodChip` + `.period-pop`) ancorato sotto il chip; dentro i `MobileSheet` si usa invece la griglia di pill 2-colonne (`.period-pills`) per evitare il clipping del popup.
 
-### Decise
-- **Drill categoria → dettaglio transazione: bottom sheet IMPILATO.** Il dettaglio si apre sopra la lista; chiudendolo si torna alla lista della categoria (più naturale il "indietro"). Va gestito l'ordine di chiusura (prima il dettaglio, poi la lista).
-- **Selettore periodo collassato: POPOVER** ancorato sotto il chip (è in cima alla pagina, raggiungibile). Mini bottom sheet solo come fallback se in futuro il chip finisse in basso.
+## Attività residua
+
+- Test sistematico su dispositivi reali (iOS/Android): safe-area, tastiera che copre input dentro i bottom sheet, tap accidentali.
