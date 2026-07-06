@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
@@ -15,10 +16,22 @@ from models.transaction import TransactionCreate, TransactionUpdate
 from services.audit import log
 from services.geocoder import geocode_from_location
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 # Safe upper bound for aggregate queries — personal app won't exceed this
 _ALL_ROWS = 10_000
+
+
+def _warn_if_capped(rows: list, endpoint: str) -> None:
+    """Il tetto _ALL_ROWS tronca in silenzio: su summary/timeline significherebbe
+    un saldo sbagliato senza alcun segnale. Almeno lo si vede nei log."""
+    if len(rows) >= _ALL_ROWS:
+        logger.warning(
+            "%s: raggiunto il tetto di %d righe — risultati troncati, saldo potenzialmente errato",
+            endpoint, _ALL_ROWS,
+        )
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -88,7 +101,7 @@ _SORT_COLUMNS = {"date", "amount", "category", "description"}
 
 @router.get("")
 @limiter.limit("200/minute")
-async def list_transactions(
+def list_transactions(
     request: Request,
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
@@ -120,7 +133,7 @@ async def list_transactions(
 
 @router.get("/deleted")
 @limiter.limit("60/minute")
-async def list_deleted_transactions(
+def list_deleted_transactions(
     request: Request,
     _user=Depends(get_current_user),
 ):
@@ -138,7 +151,7 @@ async def list_deleted_transactions(
 
 @router.get("/summary")
 @limiter.limit("60/minute")
-async def get_summary(
+def get_summary(
     request: Request,
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
@@ -148,6 +161,7 @@ async def get_summary(
     q = client.table("transactions").select("category,amount").is_("deleted_at", "null").limit(_ALL_ROWS)
     q = _date_filter(q, from_date, to_date)
     rows = q.execute().data
+    _warn_if_capped(rows, "GET /transactions/summary")
 
     spese_totali = sum(abs(r["amount"]) for r in rows if r["amount"] < 0)
     entrate_totali = sum(r["amount"] for r in rows if r["amount"] > 0)
@@ -172,7 +186,7 @@ async def get_summary(
 
 @router.get("/timeline")
 @limiter.limit("60/minute")
-async def get_timeline(
+def get_timeline(
     request: Request,
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
@@ -206,6 +220,7 @@ async def get_timeline(
         if to_date:
             q = q.lte("date", str(to_date))
         rows = q.execute().data
+        _warn_if_capped(rows, "GET /transactions/timeline (spending)")
         buckets: dict[str, float] = {}
         for r in rows:
             if spending and r["amount"] >= 0:
@@ -231,6 +246,7 @@ async def get_timeline(
     if to_date:
         q = q.lte("date", str(to_date))
     rows = q.execute().data
+    _warn_if_capped(rows, "GET /transactions/timeline")
 
     buckets2: dict[str, float] = {}
     for r in rows:
@@ -250,7 +266,7 @@ async def get_timeline(
 
 @router.post("", status_code=201)
 @limiter.limit("60/minute")
-async def create_transaction(
+def create_transaction(
     request: Request,
     body: TransactionCreate,
     _user=Depends(get_current_user),
@@ -264,7 +280,7 @@ async def create_transaction(
 
 @router.put("/{transaction_id}")
 @limiter.limit("60/minute")
-async def update_transaction(
+def update_transaction(
     request: Request,
     transaction_id: int,
     body: TransactionUpdate,
@@ -274,6 +290,25 @@ async def update_transaction(
     updates = body.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
+
+    # L'importo di una transazione divisa non è modificabile: la somma delle
+    # parti in split_items non corrisponderebbe più all'originale.
+    if "amount" in updates:
+        tx = (
+            client.table("transactions")
+            .select("is_split")
+            .eq("id", transaction_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        if not tx.data:
+            raise HTTPException(status_code=404, detail="Transazione non trovata")
+        if tx.data[0].get("is_split"):
+            raise HTTPException(
+                status_code=400,
+                detail="Transazione divisa: l'importo non è modificabile",
+            )
+
     result = (
         client.table("transactions")
         .update(updates)
@@ -294,7 +329,7 @@ class CategoryBody(BaseModel):
 
 @router.patch("/{transaction_id}/category")
 @limiter.limit("120/minute")
-async def set_category(
+def set_category(
     request: Request,
     transaction_id: int,
     body: CategoryBody,
@@ -347,6 +382,7 @@ async def set_category(
             client.table("transactions")
             .update({"category": body.category})
             .in_("id", body.ids)
+            .is_("deleted_at", "null")
             .execute()
         )
     else:
@@ -369,7 +405,7 @@ class LocationBody(BaseModel):
 
 @router.put("/{transaction_id}/location")
 @limiter.limit("120/minute")
-async def set_location(
+def set_location(
     request: Request,
     transaction_id: int,
     body: LocationBody,
@@ -438,6 +474,7 @@ async def set_location(
         client.table("transactions")
         .update(loc_fields)
         .in_("id", target_ids)
+        .is_("deleted_at", "null")
         .execute()
     )
 
@@ -446,7 +483,7 @@ async def set_location(
 
 @router.delete("/{transaction_id}", status_code=204)
 @limiter.limit("30/minute")
-async def delete_transaction(
+def delete_transaction(
     request: Request,
     transaction_id: int,
     _user=Depends(get_current_user),
@@ -466,7 +503,7 @@ async def delete_transaction(
     user_email = getattr(_user, "email", "")
     ip = request.client.host if request.client else ""
     deleted = result.data[0]
-    await log(
+    log(
         "DELETE_TRANSACTION",
         user_email,
         {"transaction_id": transaction_id, "amount": deleted.get("amount")},
@@ -476,7 +513,7 @@ async def delete_transaction(
 
 @router.patch("/{transaction_id}/restore", status_code=200)
 @limiter.limit("30/minute")
-async def restore_transaction(
+def restore_transaction(
     request: Request,
     transaction_id: int,
     _user=Depends(get_current_user),
@@ -491,7 +528,17 @@ async def restore_transaction(
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="Transazione non trovata o già attiva")
-    return result.data[0]
+
+    user_email = getattr(_user, "email", "")
+    ip = request.client.host if request.client else ""
+    restored = result.data[0]
+    log(
+        "RESTORE_TRANSACTION",
+        user_email,
+        {"transaction_id": transaction_id, "amount": restored.get("amount")},
+        ip,
+    )
+    return restored
 
 
 # ── split ─────────────────────────────────────────────────────────────────────
@@ -508,7 +555,7 @@ class SplitBody(BaseModel):
 
 @router.post("/{transaction_id}/split", status_code=201)
 @limiter.limit("30/minute")
-async def split_transaction(
+def split_transaction(
     request: Request,
     transaction_id: int,
     body: SplitBody,
@@ -538,8 +585,9 @@ async def split_transaction(
         diff = round(abs(original - total_split), 2)
         raise HTTPException(status_code=400, detail=f"Differenza: €{diff:.2f}")
 
-    client.table("transactions").update({"is_split": True}).eq("id", transaction_id).execute()
-
+    # Prima le parti, poi il flag: se l'insert fallisce non resta una
+    # transazione marcata "divisa" senza parti (Supabase REST non ha
+    # transazioni SQL). Se invece fallisce il flag, si ripuliscono le parti.
     items_data = [
         {
             "transaction_id": transaction_id,
@@ -551,9 +599,15 @@ async def split_transaction(
     ]
     client.table("split_items").insert(items_data).execute()
 
+    try:
+        client.table("transactions").update({"is_split": True}).eq("id", transaction_id).execute()
+    except Exception:
+        client.table("split_items").delete().eq("transaction_id", transaction_id).execute()
+        raise
+
     user_email = getattr(_user, "email", "")
     ip = request.client.host if request.client else ""
-    await log(
+    log(
         "SPLIT_CREATED",
         user_email,
         {"transaction_id": transaction_id, "parts": len(body.items)},

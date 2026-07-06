@@ -8,7 +8,7 @@ Browser
   ├─► Vercel          — frontend React (SPA statica, CDN globale)
   │     URL: https://finance-tracker-six-neon.vercel.app
   │
-  ├─► Railway         — backend FastAPI (container always-on, regione US West)
+  ├─► Railway         — backend FastAPI (container always-on, regione europe-west4 Amsterdam)
   │     URL: https://finance-tracker-production-a7c5.up.railway.app
   │     └─► Supabase PostgreSQL  (database)
   │
@@ -28,7 +28,6 @@ Browser
 | File | Scopo |
 |---|---|
 | `backend/Dockerfile` | Build del container Python per Railway |
-| `backend/fly.toml` | Non usato (rimasto da setup iniziale con Fly.io) |
 | `backend/.env.example` | Template variabili d'ambiente backend |
 | `frontend/.env.example` | Template variabili d'ambiente frontend |
 | `frontend/vercel.json` | Rewrite SPA (evita 404 su refresh di pagina) |
@@ -160,6 +159,7 @@ L'ordine conta: Supabase prima (fornisce le chiavi), poi Railway e Vercel (usano
    - `migration_soft_delete.sql` — aggiunge il soft delete su transactions
    - `migration_merchant_locations.sql` — crea la tabella per la geocodifica esercenti (Mappa)
    - `migration_transaction_location_override.sql` — aggiunge le colonne `loc_city/lat/lng` su transactions (Mappa)
+   - `migration_rls.sql` — abilita la Row Level Security su tutte le tabelle (blocca l'accesso diretto via anon key; il backend usa la service role e non è impattato)
 6. **Configurare l'autenticazione email**: **Authentication → Providers → Email** → assicurarsi che sia abilitato.
 7. **Aggiungere il redirect URL per il reset password**: **Authentication → URL Configuration → Allowed Redirect URLs** → aggiungere:
    ```
@@ -242,4 +242,4 @@ https://<dominio-vercel>.vercel.app/reset-password
 - **Logs backend**: Railway dashboard → servizio → **Logs** (in tempo reale).
 - **Logs frontend**: Vercel dashboard → **Deployments → Functions**.
 - **Cold start**: Railway mantiene il container always-on, nessun cold start.
-- **Regione**: Railway US West. Se la latenza verso Supabase fosse un problema, valutare di cambiare regione Railway in modo che coincida con quella del progetto Supabase.
+- **Regione**: Railway **europe-west4 (Amsterdam)**, allineata al progetto Supabase in EU (spostata a luglio 2026 da US West per eliminare la latenza transatlantica su ogni query). Se si rifà il deploy da zero, scegliere la regione Railway più vicina a quella del progetto Supabase (Settings → Regions del servizio).

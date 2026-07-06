@@ -7,7 +7,7 @@ from db.supabase import get_client
 logger = logging.getLogger(__name__)
 
 
-async def log(action: str, user_email: str, details: dict, ip: str = "") -> None:
+def log(action: str, user_email: str, details: dict, ip: str = "") -> None:
     """Insert an audit log entry. Never raises — audit must not break main flow."""
     try:
         client = get_client()

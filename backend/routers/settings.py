@@ -30,7 +30,7 @@ def _validate_value(key: str, value: str) -> None:
 
 @router.get("")
 @limiter.limit("60/minute")
-async def get_settings(request: Request, _user=Depends(get_current_user)):
+def get_settings(request: Request, _user=Depends(get_current_user)):
     client = get_client()
     rows = client.table("settings").select("key,value,value_type").execute().data
     return {
@@ -44,7 +44,7 @@ class SettingUpdate(BaseModel):
 
 @router.put("/{key}")
 @limiter.limit("30/minute")
-async def update_setting(
+def update_setting(
     request: Request,
     key: str,
     body: SettingUpdate,

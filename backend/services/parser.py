@@ -100,7 +100,10 @@ def _find_excel_header_row(file_bytes: bytes) -> int:
 
 def _read_file(file_bytes: bytes, filename: str) -> pd.DataFrame:
     ext = filename.rsplit('.', 1)[-1].lower()
-    if ext in ('xlsx', 'xls'):
+    if ext == 'xls':
+        # Il vecchio formato binario richiederebbe xlrd, che non è installato
+        raise ValueError("formato .xls non supportato: convertire il file in .xlsx o CSV")
+    if ext == 'xlsx':
         header_row = _find_excel_header_row(file_bytes)
         return pd.read_excel(io.BytesIO(file_bytes), dtype=str, skiprows=header_row)
 

@@ -14,7 +14,15 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 
-app = FastAPI(title="Finance Tracker API", version="2.0.0", docs_url="/docs")
+# In produzione lo schema OpenAPI (/docs, /redoc, /openapi.json) non è esposto
+_is_prod = os.getenv("ENV", "development") == "production"
+app = FastAPI(
+    title="Finance Tracker API",
+    version="2.0.0",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 

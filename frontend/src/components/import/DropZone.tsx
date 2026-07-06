@@ -14,8 +14,8 @@ export function DropZone({ onFile, loading, error }: Props) {
 
   const handle = (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase()
-    if (!['csv', 'xlsx', 'xls'].includes(ext ?? '')) {
-      alert('Formato non supportato. Usa CSV o Excel (.xlsx, .xls)')
+    if (!['csv', 'xlsx'].includes(ext ?? '')) {
+      alert('Formato non supportato. Usa CSV o Excel (.xlsx)')
       return
     }
     onFile(file)
@@ -39,7 +39,7 @@ export function DropZone({ onFile, loading, error }: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.xlsx,.xls"
+        accept=".csv,.xlsx"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]

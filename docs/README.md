@@ -131,12 +131,12 @@ Supporta il salvataggio di **profili di import** per banca (mappatura colonne ri
 ### Categorizzazione automatica
 Implementata in `services/categorizer.py`. Ordine di precedenza nel determinare la categoria di un movimento:
 
-1. **Stipendio** — se `amount > 600` (soglia `STIPENDIO_THRESHOLD`).
-2. **Regole utente** (`user_rules`) — se la descrizione contiene un `pattern` salvato, vince la sua categoria.
+1. **Regole utente** (`user_rules`) — se la descrizione contiene un `pattern` salvato, vince la sua categoria (priorità assoluta, anche sulla soglia stipendio).
+2. **Stipendio** — se `amount > 600` (soglia `STIPENDIO_THRESHOLD`).
 3. **Entrate** (`amount > 0`) — match sulle keyword delle categorie income (Contanti, Rimborsi); altrimenti `Altro`.
 4. **Uscite** (`amount < 0`) — match sulle keyword delle categorie expense; altrimenti `Altro`.
 
-> **Sorgente delle keyword**: il **database è la fonte di verità**. Le `EXPENSE_RULES`/`INCOME_RULES` hardcoded servono solo come seed iniziale. Al primo `GET /categories` le categorie senza keyword nel DB vengono popolate (*lazy seed*) con i valori hardcoded. Tutte le chiamate a `categorize()` (import, ricategorizzazione) ricevono le keyword dal DB tramite il parametro `db_categories`.
+> **Sorgente delle keyword**: il **database è la fonte di verità**, sia per le uscite che per le entrate. Le `EXPENSE_RULES`/`INCOME_RULES` hardcoded servono solo come seed iniziale. Al primo `GET /categories` le categorie senza keyword nel DB vengono popolate (*lazy seed*) con i valori hardcoded. Tutte le chiamate a `categorize()` (import, ricategorizzazione) ricevono le keyword dal DB (`db_categories` + `db_income_categories`). Le categorie create dall'utente vengono considerate nel matching, in coda a quelle predefinite (l'ordine hardcoded decide chi vince sui match ambigui, es. "autostrada" → Auto prima di Spostamenti).
 
 ### Geocodifica
 Implementata in `services/geocoder.py`. Estrae la città dalla descrizione della transazione e la risolve in coordinate.
@@ -198,8 +198,6 @@ Tutti gli endpoint richiedono `Authorization: Bearer <jwt>` e sono soggetti a ra
 |---|---|---|
 | GET | `/locations/map` | Spese geolocalizzate del periodo (`?from=&to=`), aggregate per città. Solo transazioni con `amount < 0`. |
 | POST | `/locations/enrich` | Geocodifica retroattiva bulk: processa le descrizioni ancora assenti da `merchant_locations`. |
-| GET | `/locations/unresolved` | Descrizioni senza posizione in `merchant_locations` (endpoint non usato dal frontend, presente per debug). |
-| PUT | `/locations/{description}` | Aggiorna manualmente city/lat/lng in `merchant_locations` impostando `source='manual'` (endpoint non usato dal frontend, superato da `PUT /transactions/{id}/location`). |
 
 ### `/categories`
 | Metodo | Path | Descrizione |
@@ -226,7 +224,7 @@ Tutti gli endpoint richiedono `Authorization: Bearer <jwt>` e sono soggetti a ra
 
 ### Altro
 - `GET /health` — healthcheck (no auth).
-- `GET /docs` — documentazione interattiva OpenAPI.
+- `GET /docs` — documentazione interattiva OpenAPI (solo in development: con `ENV=production` è disattivata insieme a `/redoc` e `/openapi.json`).
 
 ---
 
@@ -270,5 +268,7 @@ Eseguire una sola volta lo script [`docs/migration_v2.sql`](./migration_v2.sql) 
 Per il soft-delete eseguire anche [`docs/migration_soft_delete.sql`](./migration_soft_delete.sql).
 
 Per la mappa eseguire [`docs/migration_merchant_locations.sql`](./migration_merchant_locations.sql) e [`docs/migration_transaction_location_override.sql`](./migration_transaction_location_override.sql).
+
+Per la sicurezza eseguire [`docs/migration_rls.sql`](./migration_rls.sql): abilita la RLS su tutte le tabelle senza policy, così l'API REST di Supabase (anon key, esposta nel bundle frontend) non può accedere ai dati — solo il backend (service role) può.
 
 Per azzerare tutte le posizioni e forzare un ricalcolo completo (es. dopo un fix al geocoder): [`docs/reset_locations.sql`](./reset_locations.sql).

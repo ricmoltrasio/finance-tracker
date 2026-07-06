@@ -14,8 +14,8 @@ HARDCODED_KEYWORDS: dict[str, list[str]] = {
 }
 
 
-def load_db_categories(client) -> dict[str, list[str]]:
-    """Restituisce {nome_categoria: [keywords]} per le categorie di uscita.
+def load_db_categories(client) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Restituisce ({uscite}, {entrate}) come {nome_categoria: [keywords]}.
 
     Usa le keyword del DB; se una categoria non ne ha, ricade su quelle
     hardcoded (stesso comportamento del lazy-seed di GET /categories).
@@ -26,11 +26,12 @@ def load_db_categories(client) -> dict[str, list[str]]:
         .execute()
         .data
     )
-    return {
-        c["name"]: c.get("keywords") or HARDCODED_KEYWORDS.get(c["name"], [])
-        for c in cats
-        if not c["is_income"]
-    }
+    expenses: dict[str, list[str]] = {}
+    incomes: dict[str, list[str]] = {}
+    for c in cats:
+        kws = c.get("keywords") or HARDCODED_KEYWORDS.get(c["name"], [])
+        (incomes if c["is_income"] else expenses)[c["name"]] = kws
+    return expenses, incomes
 
 
 def load_user_rules(client) -> list[dict]:

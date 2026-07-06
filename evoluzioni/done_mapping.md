@@ -100,7 +100,7 @@ POST /locations/enrich  ("📍 Arricchisci posizioni" sulla pagina Mappa)
 - `routers/locations.py`:
   - `GET /locations/map?from=&to=` — solo spese, aggregate per city.
   - `POST /locations/enrich` — geocodifica retroattiva bulk.
-  - `GET /locations/unresolved`, `PUT /locations/{description}` — scritti per il piano originale ("pannello esercenti senza posizione") ma **non usati dal frontend**: la correzione manuale è finita nel drawer transazione (vedi sotto).
+  - `GET /locations/unresolved`, `PUT /locations/{description}` — scritti per il piano originale ("pannello esercenti senza posizione") ma mai usati dal frontend: la correzione manuale è finita nel drawer transazione (vedi sotto). **Rimossi a luglio 2026** durante la pulizia dead code (vedi `docs/assessment.md`).
 - `routers/transactions.py: PUT /{id}/location` — endpoint realmente usato per la correzione manuale, con preview (`dry_run`) e scelta "solo questa" vs "tutte le transazioni di questo esercente", sullo stesso pattern già esistente per la categoria.
 - Risposta `/transactions` arricchita con `city` calcolato (override per-riga o join `merchant_locations`).
 

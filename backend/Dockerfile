@@ -9,4 +9,6 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# --proxy-headers: dietro il proxy Railway, ricava l'IP reale del client da
+# X-Forwarded-For (usato da rate limiting e audit log) invece dell'IP del proxy
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]

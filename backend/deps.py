@@ -34,7 +34,7 @@ def _cache_put(token: str, user) -> None:
     _token_cache[token] = (time.monotonic() + _TOKEN_TTL_SECONDS, user)
 
 
-async def get_current_user(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_security),
 ):
     token = credentials.credentials

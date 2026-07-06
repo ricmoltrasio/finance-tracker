@@ -203,7 +203,7 @@ Traccia delle azioni sensibili. Scrittura best-effort (non blocca mai il flusso 
 
 - **Segno importo**: uscite negative, entrate positive. `summary` e `timeline` distinguono per segno.
 - **Soft delete**: le transazioni eliminate non vengono rimosse fisicamente — viene impostato `deleted_at`. Tutte le query applicative filtrano `WHERE deleted_at IS NULL`. Il deduplicatore confronta anche con le righe soft-deleted per prevenire re-import.
-- **Soglia stipendio**: importi `> 600` sono categorizzati come `Stipendio` indipendentemente dalla descrizione.
+- **Soglia stipendio**: importi `> 600` sono categorizzati come `Stipendio` indipendentemente dalla descrizione, **salvo** una regola utente esplicita (`user_rules`), che ha priorità.
 - **Deduplicazione**: identità di un movimento = `(date, lower(trim(description)), round(amount, 2))`.
 - **Budget**: valorizzato solo sulle categorie di uscita; le proiezioni di fine mese sono calcolate lato frontend solo per `Cibo` e `Auto`.
 - **Categorie testuali**: `transactions.category` può contenere nomi non presenti in `categories` (es. `Altro`, `Stipendio`), per questo non esiste una FK.

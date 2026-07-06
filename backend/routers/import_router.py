@@ -28,12 +28,12 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 @router.post("/preview")
 @limiter.limit("30/minute")
-async def preview(
+def preview(
     request: Request,
     file: UploadFile = File(...),
     _user=Depends(get_current_user),
 ):
-    contents = await file.read()
+    contents = file.file.read()
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File troppo grande (max 10 MB)")
     try:
@@ -52,7 +52,6 @@ class ImportConfirmBody(BaseModel):
     col_amount: Optional[str] = None
     col_dare: Optional[str] = None
     col_avere: Optional[str] = None
-    col_location: Optional[str] = None
     raw_rows: list[dict]
     bank_name: Optional[str] = None
     profile_id: Optional[int] = None
@@ -60,7 +59,7 @@ class ImportConfirmBody(BaseModel):
 
 @router.post("/confirm")
 @limiter.limit("10/minute")
-async def confirm(
+def confirm(
     request: Request,
     body: ImportConfirmBody,
     _user=Depends(get_current_user),
@@ -80,10 +79,10 @@ async def confirm(
 
     client = get_client()
     user_rules = load_user_rules(client)
-    db_categories = load_db_categories(client)
+    db_expenses, db_incomes = load_db_categories(client)
 
     for row in rows:
-        row["category"] = categorize(row["description"], row["amount"], user_rules, db_categories)
+        row["category"] = categorize(row["description"], row["amount"], user_rules, db_expenses, db_incomes)
         row["source"] = "import"
         row["tags"] = []
         row["is_split"] = False
@@ -127,7 +126,7 @@ async def confirm(
 
     user_email = getattr(_user, "email", "")
     ip = request.client.host if request.client else ""
-    await log(
+    log(
         "IMPORT_COMPLETED",
         user_email,
         {"imported": imported, "skipped_duplicates": skipped, "bank": body.bank_name},
@@ -161,14 +160,14 @@ class ProfileBody(BaseModel):
 
 @router.get("/profiles")
 @limiter.limit("60/minute")
-async def list_profiles(request: Request, _user=Depends(get_current_user)):
+def list_profiles(request: Request, _user=Depends(get_current_user)):
     client = get_client()
     return client.table("import_profiles").select("*").order("bank_name").execute().data
 
 
 @router.post("/profiles", status_code=201)
 @limiter.limit("30/minute")
-async def create_profile(request: Request, body: ProfileBody, _user=Depends(get_current_user)):
+def create_profile(request: Request, body: ProfileBody, _user=Depends(get_current_user)):
     client = get_client()
     result = client.table("import_profiles").insert(body.model_dump()).execute()
     return result.data[0]
@@ -176,7 +175,7 @@ async def create_profile(request: Request, body: ProfileBody, _user=Depends(get_
 
 @router.put("/profiles/{profile_id}")
 @limiter.limit("30/minute")
-async def update_profile(
+def update_profile(
     request: Request, profile_id: int, body: ProfileBody, _user=Depends(get_current_user)
 ):
     client = get_client()
@@ -193,6 +192,6 @@ async def update_profile(
 
 @router.delete("/profiles/{profile_id}", status_code=204)
 @limiter.limit("30/minute")
-async def delete_profile(request: Request, profile_id: int, _user=Depends(get_current_user)):
+def delete_profile(request: Request, profile_id: int, _user=Depends(get_current_user)):
     client = get_client()
     client.table("import_profiles").delete().eq("id", profile_id).execute()

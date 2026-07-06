@@ -19,14 +19,6 @@ export const locationsApi = {
     return apiFetch<MapPoint[]>(`/locations/map${qs ? '?' + qs : ''}`)
   },
 
-  unresolved: () => apiFetch<string[]>('/locations/unresolved'),
-
-  updateLocation: (description: string, body: { city: string; lat: number; lng: number }) =>
-    apiFetch<unknown>(`/locations/${encodeURIComponent(description)}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
-
   enrich: () =>
     apiFetch<{ processed: number; enriched: number }>('/locations/enrich', { method: 'POST' }),
 }

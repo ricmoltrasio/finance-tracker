@@ -20,6 +20,11 @@ class TestUserRules:
         rules = [{"pattern": "netflix", "category": "Intrattenimento"}]
         assert categorize("Pagamento NETFLIX.COM", -12.99, user_rules=rules) == "Intrattenimento"
 
+    def test_user_rule_ha_priorita_sulla_soglia_stipendio(self):
+        # Un'entrata sopra soglia corretta a mano deve restare nella sua categoria
+        rules = [{"pattern": "rimborso 730", "category": "Rimborsi"}]
+        assert categorize("RIMBORSO 730 AGENZIA ENTRATE", 700.0, user_rules=rules) == "Rimborsi"
+
 
 class TestExpenseKeywords:
     def test_supermercato_in_cibo(self):
@@ -59,3 +64,16 @@ class TestDbCategories:
         db = {"Auto": ["benzinaio-x"]}
         # Cibo non è nel dict → usa le keyword hardcoded
         assert categorize("ESSELUNGA", -25.0, db_categories=db) == "Cibo"
+
+    def test_categoria_nuova_solo_db_viene_matchata(self):
+        # Una categoria creata dall'utente (assente dalle regole hardcoded)
+        # deve comunque essere considerata
+        db = {"Animali": ["veterinario", "toelettatura"]}
+        assert categorize("VETERINARIO ROSSI", -80.0, db_categories=db) == "Animali"
+
+    def test_keyword_db_entrate_sostituiscono_hardcoded(self):
+        db_income = {"Rimborsi": ["cashback"]}
+        # la keyword DB vince per le entrate
+        assert categorize("CASHBACK STATO", 50.0, db_income_categories=db_income) == "Rimborsi"
+        # la keyword hardcoded di Rimborsi non è più attiva per quella categoria
+        assert categorize("RIMBORSO SPESE", 50.0, db_income_categories=db_income) == "Altro"

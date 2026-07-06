@@ -121,40 +121,58 @@ INCOME_RULES: list[tuple[str, list[str]]] = [
 STIPENDIO_THRESHOLD = 600.0
 
 
+def _merge_rules(
+    hardcoded: list[tuple[str, list[str]]],
+    db_rules: dict[str, list[str]] | None,
+) -> list[tuple[str, list[str]]]:
+    """Keyword del DB al posto delle hardcoded (stessa precedenza: l'ordine
+    hardcoded decide chi vince sui match ambigui); le categorie presenti solo
+    nel DB (create dall'utente) vengono accodate."""
+    merged = [(name, (db_rules or {}).get(name) or kws) for name, kws in hardcoded]
+    if db_rules:
+        known = {name for name, _ in hardcoded}
+        merged += [
+            (name, kws)
+            for name, kws in db_rules.items()
+            if name not in known and kws
+        ]
+    return merged
+
+
 def categorize(
     description: str,
     amount: float = 0.0,
     user_rules: list[dict] | None = None,
     db_categories: dict[str, list[str]] | None = None,
+    db_income_categories: dict[str, list[str]] | None = None,
 ) -> str:
     """
-    db_categories: {category_name: [keywords]} from the DB categories table.
-    When provided, DB keywords replace hardcoded ones for that category.
-    Falls back to EXPENSE_RULES for any category not in db_categories.
+    db_categories / db_income_categories: {category_name: [keywords]} dalla
+    tabella categories (rispettivamente uscite ed entrate). Se presenti, le
+    keyword DB sostituiscono quelle hardcoded per quella categoria; le
+    categorie solo-DB vengono comunque considerate (in coda).
     """
-    if amount > STIPENDIO_THRESHOLD:
-        return "Stipendio"
-
     desc_lower = description.lower().strip()
 
+    # Le regole utente hanno priorità assoluta, anche sulla soglia stipendio:
+    # un'entrata sopra soglia corretta a mano (es. rimborso da 700 €) deve
+    # restare nella categoria scelta dall'utente.
     if user_rules:
         for rule in user_rules:
             if rule["pattern"] in desc_lower:
                 return rule["category"]
 
-    expense_rules = [
-        (name, (db_categories or {}).get(name) or kws)
-        for name, kws in EXPENSE_RULES
-    ]
+    if amount > STIPENDIO_THRESHOLD:
+        return "Stipendio"
 
     if amount > 0:
-        for category, keywords in INCOME_RULES:
+        for category, keywords in _merge_rules(INCOME_RULES, db_income_categories):
             for kw in keywords:
                 if kw in desc_lower:
                     return category
         return "Altro"
 
-    for category, keywords in expense_rules:
+    for category, keywords in _merge_rules(EXPENSE_RULES, db_categories):
         for kw in keywords:
             if kw in desc_lower:
                 return category

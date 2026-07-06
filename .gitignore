@@ -19,6 +19,9 @@ build/
 *.db
 *.sqlite
 
+# Backup locali (dati finanziari: mai nel repo pubblico)
+backups/
+
 # Node / Frontend
 node_modules/
 frontend/dist/

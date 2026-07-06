@@ -37,7 +37,7 @@ class CategoryUpdate(BaseModel):
 
 @router.get("")
 @limiter.limit("60/minute")
-async def list_categories(request: Request, _user=Depends(get_current_user)):
+def list_categories(request: Request, _user=Depends(get_current_user)):
     client = get_client()
     rows = (
         client.table("categories")
@@ -58,7 +58,7 @@ async def list_categories(request: Request, _user=Depends(get_current_user)):
 
 @router.post("", status_code=201)
 @limiter.limit("20/minute")
-async def create_category(
+def create_category(
     request: Request, body: CategoryCreate, _user=Depends(get_current_user)
 ):
     client = get_client()
@@ -68,7 +68,7 @@ async def create_category(
 
 @router.put("/{category_id}")
 @limiter.limit("30/minute")
-async def update_category(
+def update_category(
     request: Request,
     category_id: int,
     body: CategoryUpdate,
@@ -86,18 +86,29 @@ async def update_category(
 
     user_email = getattr(_user, "email", "")
     ip = request.client.host if request.client else ""
-    await log("CATEGORY_UPDATED", user_email, {"category_id": category_id}, ip)
+    log("CATEGORY_UPDATED", user_email, {"category_id": category_id}, ip)
 
     return result.data[0]
 
 
 @router.delete("/{category_id}", status_code=204)
 @limiter.limit("20/minute")
-async def delete_category(
+def delete_category(
     request: Request, category_id: int, _user=Depends(get_current_user)
 ):
     client = get_client()
-    client.table("categories").delete().eq("id", category_id).execute()
+    result = client.table("categories").delete().eq("id", category_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Categoria non trovata")
+
+    user_email = getattr(_user, "email", "")
+    ip = request.client.host if request.client else ""
+    log(
+        "CATEGORY_DELETED",
+        user_email,
+        {"category_id": category_id, "name": result.data[0].get("name")},
+        ip,
+    )
 
 
 def _do_recategorize(client, rows: list[dict], dry_run: bool = False) -> dict:
@@ -106,12 +117,12 @@ def _do_recategorize(client, rows: list[dict], dry_run: bool = False) -> dict:
     Conta solo le transazioni che effettivamente cambiano categoria.
     Restituisce {updated, changes: [{id, description, from_cat, to_cat}]}.
     """
-    db_categories = load_db_categories(client)
+    db_expenses, db_incomes = load_db_categories(client)
     user_rules = load_user_rules(client)
 
     by_new_cat: dict[str, list[dict]] = {}
     for row in rows:
-        new_cat = categorize(row["description"], float(row["amount"]), user_rules, db_categories)
+        new_cat = categorize(row["description"], float(row["amount"]), user_rules, db_expenses, db_incomes)
         old_cat = row.get("category", "")
         if new_cat == old_cat:
             continue
@@ -134,7 +145,7 @@ def _do_recategorize(client, rows: list[dict], dry_run: bool = False) -> dict:
 
 @router.post("/recategorize-all")
 @limiter.limit("5/minute")
-async def recategorize_all(
+def recategorize_all(
     request: Request,
     dry_run: bool = False,
     _user=Depends(get_current_user),
@@ -152,13 +163,13 @@ async def recategorize_all(
     if not dry_run:
         user_email = getattr(_user, "email", "")
         ip = request.client.host if request.client else ""
-        await log("RECATEGORIZE_ALL", user_email, {"updated": result["updated"]}, ip)
+        log("RECATEGORIZE_ALL", user_email, {"updated": result["updated"]}, ip)
     return result
 
 
 @router.post("/recategorize-uncategorized")
 @limiter.limit("5/minute")
-async def recategorize_uncategorized(
+def recategorize_uncategorized(
     request: Request,
     dry_run: bool = False,
     _user=Depends(get_current_user),
@@ -178,5 +189,5 @@ async def recategorize_uncategorized(
     if not dry_run:
         user_email = getattr(_user, "email", "")
         ip = request.client.host if request.client else ""
-        await log("RECATEGORIZE_UNCATEGORIZED", user_email, {"updated": result["updated"]}, ip)
+        log("RECATEGORIZE_UNCATEGORIZED", user_email, {"updated": result["updated"]}, ip)
     return result

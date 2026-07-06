@@ -4,8 +4,7 @@ import re
 import unicodedata
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, Request
 
 from db.supabase import get_client
 from deps import get_current_user
@@ -26,7 +25,7 @@ def _norm_desc(s: str) -> str:
 
 @router.get("/map")
 @limiter.limit("60/minute")
-async def get_map_points(
+def get_map_points(
     request: Request,
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
@@ -119,49 +118,11 @@ async def get_map_points(
     return list(city_buckets.values())
 
 
-# ── GET /locations/unresolved ─────────────────────────────────────────────────
-
-@router.get("/unresolved")
-@limiter.limit("30/minute")
-async def get_unresolved(
-    request: Request,
-    _user=Depends(get_current_user),
-):
-    """Descrizioni distinte presenti nelle transazioni ma assenti da merchant_locations."""
-    client = get_client()
-
-    # Tutte le description normalizzate delle transazioni
-    tx_rows = (
-        client.table("transactions")
-        .select("description")
-        .is_("deleted_at", "null")
-        .limit(_ALL_ROWS)
-        .execute()
-        .data
-    )
-    if not tx_rows:
-        return []
-    descriptions = list({_norm_desc(r["description"]) for r in tx_rows if r.get("description")})
-
-    # Quelle che hanno già una voce in merchant_locations con lat valorizzato
-    resolved = (
-        client.table("merchant_locations")
-        .select("description")
-        .in_("description", descriptions)
-        .not_.is_("lat", "null")
-        .execute()
-        .data
-    )
-    resolved_set = {r["description"] for r in resolved}
-
-    return sorted(d for d in descriptions if d not in resolved_set)
-
-
 # ── POST /locations/enrich ────────────────────────────────────────────────────
 
 @router.post("/enrich")
 @limiter.limit("5/minute")
-async def enrich_all(
+def enrich_all(
     request: Request,
     _user=Depends(get_current_user),
 ):
@@ -215,42 +176,3 @@ async def enrich_all(
             pass
 
     return {"processed": len(to_process), "enriched": enriched}
-
-
-# ── PUT /locations/{description} ──────────────────────────────────────────────
-
-class LocationUpdate(BaseModel):
-    city: str
-    lat: float
-    lng: float
-    country: str = "IT"
-
-
-@router.put("/{description:path}")
-@limiter.limit("60/minute")
-async def update_location(
-    request: Request,
-    description: str,
-    body: LocationUpdate,
-    _user=Depends(get_current_user),
-):
-    """Correzione manuale: imposta city/lat/lng e blocca sovrascrittura automatica."""
-    client = get_client()
-    desc_norm = _norm_desc(description)
-
-    row = {
-        "description": desc_norm,
-        "city": body.city,
-        "lat": body.lat,
-        "lng": body.lng,
-        "country": body.country,
-        "source": "manual",
-    }
-    res = (
-        client.table("merchant_locations")
-        .upsert(row, on_conflict="description")
-        .execute()
-    )
-    if not res.data:
-        raise HTTPException(status_code=500, detail="Upsert fallito")
-    return res.data[0]
