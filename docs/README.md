@@ -272,3 +272,7 @@ Per la mappa eseguire [`docs/migration_merchant_locations.sql`](./migration_merc
 Per la sicurezza eseguire [`docs/migration_rls.sql`](./migration_rls.sql): abilita la RLS su tutte le tabelle senza policy, così l'API REST di Supabase (anon key, esposta nel bundle frontend) non può accedere ai dati — solo il backend (service role) può.
 
 Per azzerare tutte le posizioni e forzare un ricalcolo completo (es. dopo un fix al geocoder): [`docs/reset_locations.sql`](./reset_locations.sql).
+
+### Backup
+
+Backup automatico settimanale del DB (il free tier Supabase non ne ha): script `backend/scripts/backup.py` eseguito ogni domenica da un repo GitHub privato, con restore documentato. Tutto in [`docs/backup.md`](./backup.md).

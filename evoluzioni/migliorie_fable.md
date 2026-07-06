@@ -6,16 +6,12 @@
 
 ---
 
-## Priorità 1 — Backup dei dati ⚙️ QUASI FATTO (luglio 2026)
+## ~~Priorità 1 — Backup dei dati~~ ✅ FATTO (luglio 2026)
 
-**L'unico rischio irreversibile rimasto.** La RLS protegge i dati da accessi esterni, ma non da un errore interno. Il piano free di Supabase **non ha backup automatici né point-in-time recovery**.
-
-**Implementato** (vedi `docs/backup.md`):
-- `backend/scripts/backup.py` — export completo in JSON (paginato, deterministico); primo backup eseguito.
+Sistema completo attivo (dettagli e procedura di restore in `docs/backup.md`):
+- `backend/scripts/backup.py` — export completo in JSON (paginato, deterministico).
 - `backend/scripts/restore.py` — restore su progetto nuovo + SQL per le sequence.
-- Workflow GitHub Actions settimanale pronto in `docs/backup.md`.
-
-**Resta da fare (manuale, una tantum):** creare il repo privato `finance-tracker-backup`, aggiungere i 2 secrets, incollare il workflow e lanciare il primo run — passi esatti in `docs/backup.md`.
+- Repo privato `finance-tracker-backup` con workflow GitHub Actions: **backup automatico ogni domenica 03:00 UTC**, retention = storia git, mail automatica se un run fallisce. Primo run verificato.
 
 ---
 
@@ -95,10 +91,9 @@ C'è già una sentinella nei log: il warning `_ALL_ROWS` (vedi assessment, B5) �
 
 ## Ordine consigliato
 
-1. **Backup** subito (rischio irreversibile) — manuale oggi, endpoint di export appena possibile.
-2. **CI** — mezz'ora, valore alto.
-3. **UptimeRobot** su `/health` — 5 minuti.
-4. **Pin dipendenze + Dependabot** — alla prossima sessione di manutenzione.
-5. Minori — opportunisticamente, quando si tocca il file interessato.
+1. **CI** — mezz'ora, valore alto.
+2. **UptimeRobot** su `/health` — 5 minuti.
+3. **Pin dipendenze + Dependabot** — alla prossima sessione di manutenzione.
+4. Minori — opportunisticamente, quando si tocca il file interessato.
 
-*(Regione Railway → EU: ✅ fatta a luglio 2026.)*
+*(Fatte a luglio 2026: backup automatico settimanale ✅ · regione Railway → EU ✅.)*

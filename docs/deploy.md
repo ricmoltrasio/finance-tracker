@@ -242,4 +242,5 @@ https://<dominio-vercel>.vercel.app/reset-password
 - **Logs backend**: Railway dashboard → servizio → **Logs** (in tempo reale).
 - **Logs frontend**: Vercel dashboard → **Deployments → Functions**.
 - **Cold start**: Railway mantiene il container always-on, nessun cold start.
+- **Backup**: il free tier Supabase non ha backup automatici — è attivo un backup settimanale via repo GitHub privato `finance-tracker-backup`; procedura e restore in [`docs/backup.md`](./backup.md).
 - **Regione**: Railway **europe-west4 (Amsterdam)**, allineata al progetto Supabase in EU (spostata a luglio 2026 da US West per eliminare la latenza transatlantica su ogni query). Se si rifà il deploy da zero, scegliere la regione Railway più vicina a quella del progetto Supabase (Settings → Regions del servizio).
