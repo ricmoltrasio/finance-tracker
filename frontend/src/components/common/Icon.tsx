@@ -194,6 +194,12 @@ const paths: Record<string, ReactNode> = {
       <path d="M8 3v15M16 6v15" />
     </>
   ),
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </>
+  ),
 }
 
 export function Icon({ name, size = 18, stroke = 1.75, ...rest }: Props) {

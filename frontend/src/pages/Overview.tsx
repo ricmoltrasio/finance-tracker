@@ -13,7 +13,8 @@ import { Spinner } from '../components/common/Spinner'
 import { EditDrawer, CreateDrawer } from '../components/transactions/TransactionDrawer'
 import { useToast } from '../context/ToastContext'
 import { formatEUR, today } from '../utils/format'
-import { isoLocal, addMonths, addDays, prevRange } from '../utils/period'
+import { isoLocal, addMonths, addDays, prevRange, lastNMonths, monthRange, monthLabel } from '../utils/period'
+import { DateField } from '../components/common/DateField'
 import { catMeta } from '../types'
 import { Link } from 'react-router-dom'
 import { transactionsApi } from '../api/transactions'
@@ -320,6 +321,7 @@ function DeletedAccordion() {
 
 export default function Overview() {
   const [period, setPeriod] = useState<PeriodKey>('3m')
+  const [customMonth, setCustomMonth] = useState('')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState(today())
   const [drawerTx, setDrawerTx] = useState<Transaction | null>(null)
@@ -330,11 +332,16 @@ export default function Overview() {
   const { toast } = useToast()
   const isMobile = useIsMobile()
 
-  const isAll = period === 'tutto'
-  const range = isAll ? null : getRange(period)
-  const from = isAll ? undefined : (customFrom || range!.from)
-  const to   = isAll ? undefined : (customTo   || range!.to)
-  const label = range?.label ?? 'Tutte le transazioni'
+  const monthOptions = useMemo(() => lastNMonths(), [])
+
+  const isAll = period === 'tutto' && !customMonth
+  const range = period === 'tutto' ? null : getRange(period)
+  const mRange = customMonth ? monthRange(customMonth) : null
+  const from = mRange ? mRange.from : isAll ? undefined : (customFrom || range!.from)
+  const to   = mRange ? mRange.to   : isAll ? undefined : (customTo   || range!.to)
+  const label = customMonth
+    ? monthLabel(new Date(customMonth + '-01T12:00:00'))
+    : (range?.label ?? 'Tutte le transazioni')
   const gran = 'day' as const
   const prev = from && to ? prevRange(from, to) : null
 
@@ -459,12 +466,22 @@ export default function Overview() {
 
         {/* period pills + date pickers */}
         {isMobile ? (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <PeriodChip
               options={PERIODS.map((p) => ({ key: p.key, label: p.label }))}
               value={period}
-              onChange={(k) => { setPeriod(k as PeriodKey); setCustomFrom('') }}
+              onChange={(k) => { setPeriod(k as PeriodKey); setCustomFrom(''); setCustomMonth('') }}
             />
+            <select
+              className={'field' + (customMonth ? ' on' : '')}
+              value={customMonth}
+              onChange={(e) => { setCustomMonth(e.target.value); setCustomFrom('') }}
+            >
+              <option value="">Mese specifico…</option>
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -473,28 +490,34 @@ export default function Overview() {
                 <button
                   key={p.key}
                   role="tab"
-                  aria-selected={period === p.key}
-                  className={'pill' + (period === p.key ? ' on' : '')}
-                  onClick={() => { setPeriod(p.key); setCustomFrom('') }}
+                  aria-selected={period === p.key && !customMonth}
+                  className={'pill' + (period === p.key && !customMonth ? ' on' : '')}
+                  onClick={() => { setPeriod(p.key); setCustomFrom(''); setCustomMonth('') }}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
+            <select
+              className={'pill-select' + (customMonth ? ' on' : '')}
+              value={customMonth}
+              onChange={(e) => { setCustomMonth(e.target.value); setCustomFrom('') }}
+            >
+              <option value="">Mese…</option>
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
             <div style={{ marginLeft: 'auto' }} />
-            <input
-              className="field"
-              type="date"
+            <DateField
               style={{ width: 140 }}
-              value={customFrom || range?.from || ''}
-              onChange={(e) => setCustomFrom(e.target.value)}
+              value={customMonth ? mRange!.from : (customFrom || range?.from || '')}
+              onChange={(v) => { setCustomFrom(v); setCustomMonth('') }}
             />
-            <input
-              className="field"
-              type="date"
+            <DateField
               style={{ width: 140 }}
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
+              value={customMonth ? mRange!.to : customTo}
+              onChange={(v) => { setCustomTo(v); setCustomMonth('') }}
             />
           </div>
         )}

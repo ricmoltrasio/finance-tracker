@@ -1,9 +1,12 @@
+import logging
 import time
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from db.supabase import get_client
+
+logger = logging.getLogger(__name__)
 
 _security = HTTPBearer()
 
@@ -48,6 +51,9 @@ def get_current_user(
         response = client.auth.get_user(token)
         user = response.user  # type: ignore[union-attr]
     except Exception:
+        # Il motivo reale (token scaduto vs errore di rete vs bug) deve
+        # finire nei log: un 401 muto è impossibile da diagnosticare.
+        logger.warning("Validazione token fallita", exc_info=True)
         raise HTTPException(status_code=401, detail="Token non valido o scaduto")
 
     if user is None:

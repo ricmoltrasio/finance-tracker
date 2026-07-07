@@ -7,6 +7,7 @@ import { EditDrawer, CreateDrawer } from '../components/transactions/Transaction
 import { Icon } from '../components/common/Icon'
 import { CategorySelect } from '../components/common/CategorySelect'
 import { PeriodChip } from '../components/common/PeriodChip'
+import { DateField } from '../components/common/DateField'
 import { MobileSheet } from '../components/common/MobileSheet'
 import { Spinner } from '../components/common/Spinner'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -259,17 +260,15 @@ export default function Transactions() {
                 Raggruppa esercenti
               </button>
               <div style={{ marginLeft: 'auto' }} />
-              <input
-                className="field field-sm"
-                type="date"
+              <DateField
+                small
                 value={customFrom || range?.from || ''}
-                onChange={(e) => setCustomFrom(e.target.value)}
+                onChange={setCustomFrom}
               />
-              <input
-                className="field field-sm"
-                type="date"
+              <DateField
+                small
                 value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
+                onChange={setCustomTo}
               />
             </div>
           </>
@@ -352,17 +351,15 @@ export default function Transactions() {
 
           <div className="sheet-label">Intervallo date</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="field"
-              type="date"
+            <DateField
+              style={{ flex: 1, minWidth: 0 }}
               value={customFrom || range?.from || ''}
-              onChange={(e) => setCustomFrom(e.target.value)}
+              onChange={setCustomFrom}
             />
-            <input
-              className="field"
-              type="date"
+            <DateField
+              style={{ flex: 1, minWidth: 0 }}
               value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
+              onChange={setCustomTo}
             />
           </div>
 

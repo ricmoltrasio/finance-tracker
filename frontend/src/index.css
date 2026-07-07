@@ -7,6 +7,9 @@
    ============================================================ */
 
 :root {
+  /* i widget nativi del browser (calendario date picker, tendine select,
+     scrollbar) seguono il tema scuro dell'app */
+  color-scheme: dark;
   --bg: #090b0e;
   --surface: #13171e;
   --surface-2: #191e27;
@@ -870,6 +873,56 @@ button {
 .field:focus {
   border-color: color-mix(in oklab, var(--accent) 50%, var(--line-2));
 }
+/* DateField: input testuale con maschera gg/mm/aaaa (il formato del
+   type="date" nativo segue la lingua del browser e non è controllabile) +
+   calendario nativo aperto via showPicker() su un input date invisibile. */
+.datefield {
+  position: relative;
+  display: inline-block;
+}
+.datefield input[type="text"] {
+  padding-right: 32px;
+}
+.datefield.sm input[type="text"] {
+  padding-right: 24px;
+}
+.datefield-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.datefield-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.datefield.sm .datefield-btn {
+  right: 2px;
+  padding: 3px;
+}
+/* input date nascosto: serve solo come ancora per showPicker().
+   color-scheme ribadito qui: il popup calendario prende il tema da questo input */
+.datefield-native {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+  color-scheme: dark;
+}
+
 select.field {
   appearance: none;
   cursor: pointer;
