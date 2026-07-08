@@ -29,6 +29,7 @@ def get_map_points(
     request: Request,
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
+    descriptions: Optional[list[str]] = Query(None),
     _user=Depends(get_current_user),
 ):
     """Restituisce punti geolocalizzati per il periodo, aggregati per city.
@@ -56,6 +57,8 @@ def get_map_points(
         q = q.gte("date", from_date)
     if to_date:
         q = q.lte("date", to_date)
+    if descriptions:
+        q = q.in_("description", descriptions)
     tx_rows = q.execute().data
     if not tx_rows:
         return []

@@ -18,12 +18,16 @@ interface Props {
   transactions: Transaction[]
   loading?: boolean
   onSelect: (t: Transaction) => void
+  /** Se presenti, abilitano il gesto di selezione esercente (doppio click
+   *  sull'intestazione del gruppo o sulle singole righe) */
+  onToggleMerchant?: (description: string) => void
+  selectedMerchants?: string[]
 }
 
 /** Vista "raggruppa esercenti": le transazioni filtrate vengono raggruppate per
  *  descrizione (esercente), con numero di movimenti e totale speso; ogni riga è
  *  un accordion che mostra le sue transazioni. */
-export function MerchantGroupList({ transactions, loading, onSelect }: Props) {
+export function MerchantGroupList({ transactions, loading, onSelect, onToggleMerchant, selectedMerchants }: Props) {
   const [open, setOpen] = useState<Set<string>>(new Set())
 
   const groups = useMemo<Group[]>(() => {
@@ -65,9 +69,14 @@ export function MerchantGroupList({ transactions, loading, onSelect }: Props) {
       {groups.map((g) => {
         const isOpen = open.has(g.description)
         const { color } = catMeta(g.category)
+        const isSelected = selectedMerchants?.includes(g.description)
         return (
           <div key={g.description} className="mgroup">
-            <button className="mgroup-head" onClick={() => toggle(g.description)}>
+            <button
+              className={'mgroup-head' + (isSelected ? ' merchant-on' : '')}
+              onClick={() => toggle(g.description)}
+              onDoubleClick={() => onToggleMerchant?.(g.description)}
+            >
               <Icon
                 name="chevRight"
                 size={15}
@@ -84,7 +93,13 @@ export function MerchantGroupList({ transactions, loading, onSelect }: Props) {
             {isOpen && (
               <div className="mgroup-body">
                 {g.txs.map((t) => (
-                  <TransactionRow key={t.id} transaction={t} onClick={onSelect} />
+                  <TransactionRow
+                    key={t.id}
+                    transaction={t}
+                    onClick={onSelect}
+                    onToggleMerchant={onToggleMerchant}
+                    merchantSelected={isSelected}
+                  />
                 ))}
               </div>
             )}

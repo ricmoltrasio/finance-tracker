@@ -6,9 +6,12 @@ interface Props {
   transactions: Transaction[]
   loading?: boolean
   onSelect: (t: Transaction) => void
+  /** Se presenti, abilitano il gesto di selezione esercente sulle righe */
+  onToggleMerchant?: (description: string) => void
+  selectedMerchants?: string[]
 }
 
-export function TransactionList({ transactions, loading, onSelect }: Props) {
+export function TransactionList({ transactions, loading, onSelect, onToggleMerchant, selectedMerchants }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -24,7 +27,13 @@ export function TransactionList({ transactions, loading, onSelect }: Props) {
   return (
     <div className="txlist d-comoda">
       {transactions.map((t) => (
-        <TransactionRow key={t.id} transaction={t} onClick={onSelect} />
+        <TransactionRow
+          key={t.id}
+          transaction={t}
+          onClick={onSelect}
+          onToggleMerchant={onToggleMerchant}
+          merchantSelected={selectedMerchants?.includes(t.description)}
+        />
       ))}
     </div>
   )

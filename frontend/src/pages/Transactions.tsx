@@ -8,6 +8,10 @@ import { Icon } from '../components/common/Icon'
 import { CategorySelect } from '../components/common/CategorySelect'
 import { PeriodChip } from '../components/common/PeriodChip'
 import { DateField } from '../components/common/DateField'
+import { MerchantChips } from '../components/common/MerchantChips'
+import { useMerchantSelection } from '../hooks/useMerchantSelection'
+import { useSummary } from '../hooks/useSummary'
+import { formatEUR } from '../utils/format'
 import { MobileSheet } from '../components/common/MobileSheet'
 import { Spinner } from '../components/common/Spinner'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -78,6 +82,7 @@ export default function Transactions() {
 
   const isMobile    = useIsMobile()
   const monthOptions = useMemo(() => lastNMonths(), [])
+  const merchantSel  = useMerchantSelection('tx')
 
   const activeFilters = [
     category !== '',
@@ -105,9 +110,27 @@ export default function Transactions() {
     category: category || undefined,
     from:     from     || undefined,
     to:       to       || undefined,
+    descriptions: merchantSel.asParam,
     sort_by:  sortBy,
     sort_dir: sortDir,
   }
+
+  // Parziale della selezione esercenti: stessi filtri della lista, calcolato
+  // dal backend (la lista è paginata, non si somma sul client)
+  const { data: selSummary } = useSummary(
+    from || undefined,
+    to || undefined,
+    {
+      category: category || undefined,
+      search: search || undefined,
+      descriptions: merchantSel.asParam,
+    },
+    merchantSel.merchants.length > 0
+  )
+  const selCount = useMemo(
+    () => (selSummary?.per_categoria ?? []).reduce((s, c) => s + c.n, 0),
+    [selSummary]
+  )
 
   // Modalità "raggruppa esercenti" carica tutto in una pagina (500);
   // altrimenti carica 50 per volta con scroll infinito.
@@ -274,6 +297,23 @@ export default function Transactions() {
           </>
         )}
 
+        {/* chip esercenti selezionati + parziale */}
+        <MerchantChips
+          merchants={merchantSel.merchants}
+          onRemove={merchantSel.toggle}
+          onClear={merchantSel.clear}
+          extra={
+            selSummary && (
+              <span className="mchips-partial">
+                {selCount} mov. · {formatEUR(-selSummary.spese_totali)}
+                {selSummary.entrate_totali > 0 && (
+                  <> · {formatEUR(selSummary.entrate_totali, { plus: true })}</>
+                )}
+              </span>
+            )
+          }
+        />
+
         {/* lista */}
         <div className="card" style={{ padding: 8 }}>
           {groupMerchants ? (
@@ -281,12 +321,16 @@ export default function Transactions() {
               transactions={transactions}
               loading={isLoading}
               onSelect={(t) => setSelected(t)}
+              onToggleMerchant={merchantSel.toggle}
+              selectedMerchants={merchantSel.merchants}
             />
           ) : (
             <TransactionList
               transactions={transactions}
               loading={isLoading}
               onSelect={(t) => setSelected(t)}
+              onToggleMerchant={merchantSel.toggle}
+              selectedMerchants={merchantSel.merchants}
             />
           )}
         </div>

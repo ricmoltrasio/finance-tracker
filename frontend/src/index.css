@@ -301,6 +301,67 @@ button {
   min-width: 0;
 }
 
+/* ---------- filtro esercenti (parziali per luogo di spesa) ---------- */
+.mchips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.mchip:hover {
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+.mchip-txt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mchip.clear {
+  background: none;
+  border-color: var(--line-2);
+  color: var(--text-2);
+}
+.mchip.clear:hover {
+  background: var(--hover);
+}
+.mchips-partial {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+/* riga transazione / intestazione gruppo con esercente nel filtro */
+.txrow.merchant-on,
+.mgroup-head.merchant-on,
+.mappa-tx-row.merchant-on {
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+  box-shadow: inset 2.5px 0 0 var(--accent);
+}
+@media (max-width: 640px) {
+  .mchip {
+    min-height: 38px;
+  }
+  .mchips-partial {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
 /* ---------- vista "raggruppa esercenti" (Transazioni) ---------- */
 .mgroup-list {
   display: flex;

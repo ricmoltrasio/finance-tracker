@@ -18,21 +18,36 @@ export interface SetLocationResult {
   transactions: Transaction[]
 }
 
-function qs(params: Record<string, string | number | undefined>): string {
-  const p = new URLSearchParams(
-    Object.entries(params)
-      .filter(([, v]) => v !== undefined && v !== '')
-      .map(([k, v]) => [k, String(v)])
-  ).toString()
-  return p ? `?${p}` : ''
+export type QueryParams = Record<string, string | number | string[] | undefined>
+
+/** Costruisce la query string; gli array diventano parametri ripetuti
+ *  (?descriptions=A&descriptions=B — le descrizioni possono contenere virgole). */
+function qs(params: QueryParams): string {
+  const p = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === '') continue
+    if (Array.isArray(v)) {
+      for (const item of v) p.append(k, item)
+    } else {
+      p.set(k, String(v))
+    }
+  }
+  const s = p.toString()
+  return s ? `?${s}` : ''
+}
+
+export interface SummaryExtra {
+  category?: string
+  search?: string
+  descriptions?: string[]
 }
 
 export const transactionsApi = {
-  list: (params: Record<string, string | number | undefined>) =>
+  list: (params: QueryParams) =>
     apiFetch<TransactionListResponse>(`/transactions${qs(params)}`),
 
-  summary: (from?: string, to?: string) =>
-    apiFetch<Summary>(`/transactions/summary${qs({ from, to })}`),
+  summary: (from?: string, to?: string, extra?: SummaryExtra) =>
+    apiFetch<Summary>(`/transactions/summary${qs({ from, to, ...extra })}`),
 
   timeline: (from?: string, to?: string, granularity = 'day', category?: string, spending = false) =>
     apiFetch<Timeline>(`/transactions/timeline${qs({ from, to, granularity, category, spending: spending ? 'true' : undefined })}`),

@@ -14,6 +14,8 @@ import { formatEUR } from '../utils/format'
 import { isoLocal, addMonths, addDays, monthLabel, lastNMonths } from '../utils/period'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { PeriodChip } from '../components/common/PeriodChip'
+import { MerchantChips } from '../components/common/MerchantChips'
+import { useMerchantSelection } from '../hooks/useMerchantSelection'
 
 const PROJECTION_CATS = ['Cibo', 'Auto']
 
@@ -38,6 +40,7 @@ export default function Budget() {
   const [openCat, setOpenCat] = useState<string | null>(null)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const isMobile = useIsMobile()
+  const merchantSel = useMerchantSelection('budget')
 
   const monthOptions = useMemo(() => lastNMonths(), [])
 
@@ -104,7 +107,9 @@ export default function Budget() {
       }
     }, [activePill, customMonth, year, month])
 
-  const { data: summary, isLoading: loadingSum } = useSummary(fromStr, toStr)
+  const { data: summary, isLoading: loadingSum } = useSummary(fromStr, toStr, {
+    descriptions: merchantSel.asParam,
+  })
   const { data: categories, isLoading: loadingCats } = useCategories()
 
   const spendingMap = useMemo(() => {
@@ -193,6 +198,13 @@ export default function Budget() {
           </select>
         </div>
       )}
+
+      {/* chip esercenti selezionati (KPI e card sotto sono già filtrati) */}
+      <MerchantChips
+        merchants={merchantSel.merchants}
+        onRemove={merchantSel.toggle}
+        onClear={merchantSel.clear}
+      />
 
       {isLoading && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
@@ -346,8 +358,11 @@ export default function Budget() {
           from={fromStr}
           to={toStr}
           periodLabel={periodDisplay}
+          descriptions={merchantSel.asParam}
           onClose={() => setOpenCat(null)}
           onSelect={(t) => setSelectedTx(t)}
+          onToggleMerchant={merchantSel.toggle}
+          selectedMerchants={merchantSel.merchants}
         />
       )}
       {selectedTx && <EditDrawer transaction={selectedTx} onClose={() => setSelectedTx(null)} />}
@@ -360,20 +375,27 @@ function CategoryTxDrawer({
   from,
   to,
   periodLabel,
+  descriptions,
   onClose,
   onSelect,
+  onToggleMerchant,
+  selectedMerchants,
 }: {
   category: string
   from: string | undefined
   to: string | undefined
   periodLabel: string
+  descriptions?: string[]
   onClose: () => void
   onSelect: (t: Transaction) => void
+  onToggleMerchant?: (description: string) => void
+  selectedMerchants?: string[]
 }) {
   const { data, isLoading } = useTransactions({
     category,
     from,
     to,
+    descriptions,
     limit: 500,
     sort_by: 'date',
     sort_dir: 'desc',
@@ -412,7 +434,13 @@ function CategoryTxDrawer({
           </div>
         </div>
 
-        <TransactionList transactions={txs} loading={isLoading} onSelect={onSelect} />
+        <TransactionList
+          transactions={txs}
+          loading={isLoading}
+          onSelect={onSelect}
+          onToggleMerchant={onToggleMerchant}
+          selectedMerchants={selectedMerchants}
+        />
       </div>
     </div>
   )

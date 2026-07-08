@@ -1,7 +1,8 @@
 # Evolutive — Filtro esercenti (parziali per luogo di spesa)
 
-**Stato:** progettata, non implementata.
+**Stato:** implementata (luglio 2026), fedele al piano. Differenze minime in fondo.
 **Data progettazione:** luglio 2026.
+**Data implementazione:** luglio 2026.
 
 ---
 
@@ -87,6 +88,13 @@ I KPI filtrati sono quindi **calcolati dal DB**, non stimati client-side sulla p
 **Totale stimato: ~2 giornate.**
 
 ---
+
+## Differenze rispetto al piano (implementazione)
+
+- Il gesto è centralizzato nell'hook **`useMerchantGesture`** (non inline in `TransactionRow`): serve anche alle righe custom della sidebar Mappa (`MappaTxRow`), che non usano `TransactionRow`.
+- `GET /transactions/summary` ha ricevuto anche i parametri **`category` e `search`** (oltre a `descriptions`): la riga parziale in Transazioni riflette così *tutti* i filtri attivi, non solo periodo + esercenti.
+- Nel Budget anche la **lista del drill categoria** è filtrata dalla selezione (`descriptions` su `useTransactions`), non solo KPI e card — coerenza completa della pagina.
+- Componenti/file effettivi: `hooks/useMerchantSelection.ts`, `hooks/useMerchantGesture.ts`, `components/common/MerchantChips.tsx`; CSS in `index.css` (`.mchips`, `.mchip`, `.merchant-on`).
 
 ## Fuori scope (esplicitamente)
 

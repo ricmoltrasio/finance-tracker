@@ -20,6 +20,9 @@ import type { PeriodOption } from '../components/common/PeriodChip'
 import { EditDrawer } from '../components/transactions/TransactionDrawer'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useToast } from '../context/ToastContext'
+import { MerchantChips } from '../components/common/MerchantChips'
+import { useMerchantSelection } from '../hooks/useMerchantSelection'
+import { useMerchantGesture } from '../hooks/useMerchantGesture'
 
 // Fix leaflet default icon path (broken by bundlers)
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -70,13 +73,15 @@ export default function Mappa() {
   const isMobile = useIsMobile()
   const { toast } = useToast()
 
+  const merchantSel = useMerchantSelection('mappa')
+
   const range = customMonth ? monthRange(customMonth) : getRange(period)
   const from = range?.from
   const to = range?.to
 
   const { data: points, isLoading } = useQuery({
-    queryKey: ['locations-map', from, to],
-    queryFn: () => locationsApi.map(from, to),
+    queryKey: ['locations-map', from, to, merchantSel.asParam ?? null],
+    queryFn: () => locationsApi.map(from, to, merchantSel.asParam),
   })
 
   async function handleEnrich() {
@@ -221,6 +226,13 @@ export default function Mappa() {
         )}
       </div>
 
+      {/* chip esercenti selezionati (marker e statistiche già filtrati) */}
+      <MerchantChips
+        merchants={merchantSel.merchants}
+        onRemove={merchantSel.toggle}
+        onClear={merchantSel.clear}
+      />
+
       {/* corpo */}
       <div className="mappa-body">
         {/* mappa */}
@@ -259,23 +271,13 @@ export default function Mappa() {
                 .slice()
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((t) => (
-                  <button
+                  <MappaTxRow
                     key={t.id}
-                    className="mappa-tx-row"
-                    onClick={() => setEditTx(t)}
-                  >
-                    <CatGlyph category={t.category} size={30} />
-                    <div className="mappa-tx-info">
-                      <div className="mappa-tx-desc">{t.description}</div>
-                      <div className="mappa-tx-meta">
-                        {formatDate(t.date)} ·{' '}
-                        <span style={{ color: catMeta(t.category).color }}>{t.category}</span>
-                      </div>
-                    </div>
-                    <span className={t.amount < 0 ? 'mappa-tx-out' : 'mappa-tx-in'}>
-                      {formatEUR(t.amount, { plus: t.amount > 0 })}
-                    </span>
-                  </button>
+                    t={t}
+                    onOpen={setEditTx}
+                    onToggleMerchant={merchantSel.toggle}
+                    merchantSelected={merchantSel.merchants.includes(t.description)}
+                  />
                 ))}
             </div>
           </div>
@@ -327,23 +329,13 @@ export default function Mappa() {
               .slice()
               .sort((a, b) => b.date.localeCompare(a.date))
               .map((t) => (
-                <button
+                <MappaTxRow
                   key={t.id}
-                  className="mappa-tx-row"
-                  onClick={() => setEditTx(t)}
-                >
-                  <CatGlyph category={t.category} size={30} />
-                  <div className="mappa-tx-info">
-                    <div className="mappa-tx-desc">{t.description}</div>
-                    <div className="mappa-tx-meta">
-                      {formatDate(t.date)} ·{' '}
-                      <span style={{ color: catMeta(t.category).color }}>{t.category}</span>
-                    </div>
-                  </div>
-                  <span className={t.amount < 0 ? 'mappa-tx-out' : 'mappa-tx-in'}>
-                    {formatEUR(t.amount, { plus: t.amount > 0 })}
-                  </span>
-                </button>
+                  t={t}
+                  onOpen={setEditTx}
+                  onToggleMerchant={merchantSel.toggle}
+                  merchantSelected={merchantSel.merchants.includes(t.description)}
+                />
               ))}
           </div>
         </MobileSheet>
@@ -360,4 +352,35 @@ export default function Mappa() {
 function formatDate(iso: string): string {
   const d = new Date(iso + 'T12:00:00')
   return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+}
+
+/** Riga transazione della sidebar/sheet città, con gesto di selezione
+ *  esercente (doppio click / long-press) come le liste delle altre pagine. */
+function MappaTxRow({
+  t,
+  onOpen,
+  onToggleMerchant,
+  merchantSelected,
+}: {
+  t: Transaction
+  onOpen: (t: Transaction) => void
+  onToggleMerchant: (description: string) => void
+  merchantSelected: boolean
+}) {
+  const gesture = useMerchantGesture(() => onOpen(t), () => onToggleMerchant(t.description))
+  return (
+    <button className={'mappa-tx-row' + (merchantSelected ? ' merchant-on' : '')} {...gesture}>
+      <CatGlyph category={t.category} size={30} />
+      <div className="mappa-tx-info">
+        <div className="mappa-tx-desc">{t.description}</div>
+        <div className="mappa-tx-meta">
+          {formatDate(t.date)} ·{' '}
+          <span style={{ color: catMeta(t.category).color }}>{t.category}</span>
+        </div>
+      </div>
+      <span className={t.amount < 0 ? 'mappa-tx-out' : 'mappa-tx-in'}>
+        {formatEUR(t.amount, { plus: t.amount > 0 })}
+      </span>
+    </button>
+  )
 }

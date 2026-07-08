@@ -1,5 +1,5 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { transactionsApi } from '../api/transactions'
+import { transactionsApi, type QueryParams } from '../api/transactions'
 import type { TransactionCreate, TransactionUpdate } from '../types'
 
 /** Ogni modifica ai movimenti rende stantii anche aggregati e timeline. */
@@ -11,7 +11,7 @@ function invalidateTransactionData(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['timeline'] })
 }
 
-export function useTransactions(params: Record<string, string | number | undefined>) {
+export function useTransactions(params: QueryParams) {
   return useQuery({
     queryKey: ['transactions', params],
     queryFn: () => transactionsApi.list(params),
@@ -19,7 +19,7 @@ export function useTransactions(params: Record<string, string | number | undefin
 }
 
 export function useInfiniteTransactions(
-  params: Record<string, string | number | undefined>,
+  params: QueryParams,
   pageSize = 50
 ) {
   return useInfiniteQuery({

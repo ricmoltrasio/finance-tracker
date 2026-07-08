@@ -11,10 +11,11 @@ export interface MapPoint {
 }
 
 export const locationsApi = {
-  map: (from?: string, to?: string) => {
+  map: (from?: string, to?: string, descriptions?: string[]) => {
     const params = new URLSearchParams()
     if (from) params.set('from', from)
     if (to) params.set('to', to)
+    for (const d of descriptions ?? []) params.append('descriptions', d)
     const qs = params.toString()
     return apiFetch<MapPoint[]>(`/locations/map${qs ? '?' + qs : ''}`)
   },

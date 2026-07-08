@@ -108,6 +108,7 @@ def list_transactions(
     category: Optional[str] = None,
     source: Optional[str] = None,
     search: Optional[str] = None,
+    descriptions: Optional[list[str]] = Query(None),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     sort_by: str = Query("date"),
@@ -127,6 +128,8 @@ def list_transactions(
         q = q.eq("source", source)
     if search:
         q = q.ilike("description", f"%{search}%")
+    if descriptions:
+        q = q.in_("description", descriptions)
     result = q.order(sort_by, desc=desc).range(offset, offset + limit - 1).execute()
     return {"data": _enrich_with_city(client, result.data), "total": result.count}
 
@@ -155,11 +158,20 @@ def get_summary(
     request: Request,
     from_date: Optional[date] = Query(None, alias="from"),
     to_date: Optional[date] = Query(None, alias="to"),
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    descriptions: Optional[list[str]] = Query(None),
     _user=Depends(get_current_user),
 ):
     client = get_client()
     q = client.table("transactions").select("category,amount").is_("deleted_at", "null").limit(_ALL_ROWS)
     q = _date_filter(q, from_date, to_date)
+    if category:
+        q = q.eq("category", category)
+    if search:
+        q = q.ilike("description", f"%{search}%")
+    if descriptions:
+        q = q.in_("description", descriptions)
     rows = q.execute().data
     _warn_if_capped(rows, "GET /transactions/summary")
 

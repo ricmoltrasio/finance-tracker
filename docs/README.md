@@ -73,6 +73,7 @@ Breakpoint `@media (max-width: 640px)` separato dall'attuale `860px` (sidebar→
 - **Eliminazione soft**: i movimenti eliminati mantengono `deleted_at` nel DB (prevenzione re-import duplicati) e sono ripristinabili dalla Panoramica.
 - **Ricategorizzazione con anteprima**: assegnando una categoria a una transazione (con propagazione attiva), viene mostrato un panel di riepilogo con la lista delle transazioni coinvolte e checkbox per deselezionare quelle da escludere. Confermando si crea/aggiorna la *regola utente* (`user_rules`) e si aggiornano solo le transazioni selezionate.
 - **Split**: suddivisione di una transazione in più parti su categorie diverse (la somma delle parti deve coincidere con l'importo originale).
+- **Filtro esercenti (parziali per luogo di spesa)**: doppio click su una transazione (pressione prolungata su mobile) aggiunge/rimuove il suo esercente (descrizione esatta) dal filtro della pagina. Con selezione attiva compare una barra chip (✕ per rimuovere, "Azzera") e una riga parziale con movimenti/spese/entrate della selezione, calcolata dal backend con gli stessi filtri attivi. Disponibile anche in Budget (KPI e card filtrati, gesto nel drill categoria) e Mappa (marker e statistiche filtrati); la selezione è per-pagina e persiste in sessione.
 - **Chip posizione**: quando una transazione ha una città associata, nella riga compare un chip 📍 cliccabile.
 - **Correzione posizione**: dal drawer di modifica transazione è possibile impostare/correggere la città, con anteprima `dry_run` e scelta "solo questa transazione" / "tutte le transazioni dello stesso esercente".
 
@@ -181,8 +182,8 @@ Tutti gli endpoint richiedono `Authorization: Bearer <jwt>` e sono soggetti a ra
 ### `/transactions`
 | Metodo | Path | Descrizione |
 |---|---|---|
-| GET | `/transactions` | Lista paginata + filtri (from, to, category, source, search, sort_by, sort_dir, limit, offset) |
-| GET | `/transactions/summary` | Totali e aggregato per categoria su un intervallo |
+| GET | `/transactions` | Lista paginata + filtri (from, to, category, source, search, `descriptions` ripetibile, sort_by, sort_dir, limit, offset) |
+| GET | `/transactions/summary` | Totali e aggregato per categoria su un intervallo; filtri opzionali `category`, `search`, `descriptions` (ripetibile) |
 | GET | `/transactions/timeline` | Saldo cumulativo / spese per bucket temporale |
 | GET | `/transactions/deleted` | Lista transazioni in soft-delete |
 | POST | `/transactions` | Crea movimento |
@@ -196,7 +197,7 @@ Tutti gli endpoint richiedono `Authorization: Bearer <jwt>` e sono soggetti a ra
 ### `/locations`
 | Metodo | Path | Descrizione |
 |---|---|---|
-| GET | `/locations/map` | Spese geolocalizzate del periodo (`?from=&to=`), aggregate per città. Solo transazioni con `amount < 0`. |
+| GET | `/locations/map` | Spese geolocalizzate del periodo (`?from=&to=` + `descriptions` ripetibile), aggregate per città. Solo transazioni con `amount < 0`. |
 | POST | `/locations/enrich` | Geocodifica retroattiva bulk: processa le descrizioni ancora assenti da `merchant_locations`. |
 
 ### `/categories`
