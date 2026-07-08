@@ -61,6 +61,7 @@ Movimenti finanziari. È la tabella centrale.
 | `date` | DATE | Data del movimento |
 | `description` | TEXT | Descrizione/causale grezza dalla banca |
 | `amount` | NUMERIC | Negativo = uscita, positivo = entrata |
+| `orig_amount` | NUMERIC | Importo **congelato all'inserimento**, mai aggiornato: è l'identità usata dalla deduplicazione (una transazione modificata a mano continua a rappresentare la riga originale del file). `NULL` per righe antecedenti alla migration |
 | `category` | TEXT | Nome categoria (match logico con `categories.name`) |
 | `source` | TEXT | `import` \| `manuale` — CHECK constraint |
 | `note` | TEXT | Nota libera |
@@ -77,7 +78,7 @@ Movimenti finanziari. È la tabella centrale.
 - `idx_transactions_date_amount` su `(date, amount)`
 - `idx_transactions_deleted_at` su `(deleted_at) WHERE deleted_at IS NOT NULL` (partial index)
 
-**Migration**: `migration_v2.sql` + `migration_soft_delete.sql` + `migration_transaction_location_override.sql`
+**Migration**: `migration_v2.sql` + `migration_soft_delete.sql` + `migration_transaction_location_override.sql` + `migration_orig_amount.sql`
 
 ---
 
@@ -204,7 +205,7 @@ Traccia delle azioni sensibili. Scrittura best-effort (non blocca mai il flusso 
 - **Segno importo**: uscite negative, entrate positive. `summary` e `timeline` distinguono per segno.
 - **Soft delete**: le transazioni eliminate non vengono rimosse fisicamente — viene impostato `deleted_at`. Tutte le query applicative filtrano `WHERE deleted_at IS NULL`. Il deduplicatore confronta anche con le righe soft-deleted per prevenire re-import.
 - **Soglia stipendio**: importi `> 600` sono categorizzati come `Stipendio` indipendentemente dalla descrizione, **salvo** una regola utente esplicita (`user_rules`), che ha priorità.
-- **Deduplicazione**: identità di un movimento = `(date, lower(trim(description)), round(amount, 2))`.
+- **Deduplicazione**: identità di un movimento = `(date, lower(trim(description)), round(orig_amount ?? amount, 2))`. `orig_amount` è congelato all'inserimento: modificare l'importo a mano non fa rientrare l'originale al re-import.
 - **Budget**: valorizzato solo sulle categorie di uscita; le proiezioni di fine mese sono calcolate lato frontend solo per `Cibo` e `Auto`.
 - **Categorie testuali**: `transactions.category` può contenere nomi non presenti in `categories` (es. `Altro`, `Stipendio`), per questo non esiste una FK.
 - **Priorità posizione**: `transactions.loc_city` (override per-transazione, impostato dalla correzione manuale nel drawer) ha priorità su `merchant_locations` (lookup per esercente). Se entrambi sono assenti la transazione non compare sulla mappa.

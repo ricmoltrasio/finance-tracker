@@ -15,7 +15,18 @@ def _norm(s: str) -> str:
 
 
 def _key(row: dict) -> tuple:
-    return (row["date"], _norm(row["description"]), round(float(row["amount"]), 2))
+    """Identità di un movimento per la deduplicazione.
+
+    Usa `orig_amount` (importo congelato all'inserimento) quando presente:
+    una transazione modificata a mano continua così a rappresentare la riga
+    originale del file e il re-import non la duplica. Fallback su `amount`
+    per le righe del file (che non hanno orig_amount) e per quelle
+    antecedenti alla migration.
+    """
+    amount = row.get("orig_amount")
+    if amount is None:
+        amount = row["amount"]
+    return (row["date"], _norm(row["description"]), round(float(amount), 2))
 
 
 def check_duplicates(rows: list[dict]) -> dict:
@@ -37,7 +48,7 @@ def check_duplicates(rows: list[dict]) -> dict:
 
     existing_raw = (
         client.table("transactions")
-        .select("date,description,amount")
+        .select("date,description,amount,orig_amount")
         .gte("date", min_date)
         .lte("date", max_date)
         .limit(50_000)

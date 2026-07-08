@@ -160,6 +160,7 @@ L'ordine conta: Supabase prima (fornisce le chiavi), poi Railway e Vercel (usano
    - `migration_merchant_locations.sql` — crea la tabella per la geocodifica esercenti (Mappa)
    - `migration_transaction_location_override.sql` — aggiunge le colonne `loc_city/lat/lng` su transactions (Mappa)
    - `migration_rls.sql` — abilita la Row Level Security su tutte le tabelle (blocca l'accesso diretto via anon key; il backend usa la service role e non è impattato)
+   - `migration_orig_amount.sql` — aggiunge `orig_amount` su transactions (deduplicazione robusta alle modifiche manuali dell'importo)
 6. **Configurare l'autenticazione email**: **Authentication → Providers → Email** → assicurarsi che sia abilitato.
 7. **Aggiungere il redirect URL per il reset password**: **Authentication → URL Configuration → Allowed Redirect URLs** → aggiungere:
    ```

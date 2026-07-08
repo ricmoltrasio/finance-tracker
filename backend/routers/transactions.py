@@ -286,6 +286,9 @@ def create_transaction(
     client = get_client()
     data = body.model_dump()
     data["date"] = str(data["date"])
+    # identità immutabile per la deduplicazione: congelata all'inserimento,
+    # mai aggiornata dalle modifiche successive
+    data["orig_amount"] = data["amount"]
     result = client.table("transactions").insert(data).execute()
     return result.data[0]
 

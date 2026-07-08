@@ -87,6 +87,8 @@ def confirm(
         row["tags"] = []
         row["is_split"] = False
         row["note"] = ""
+        # identità immutabile per la deduplicazione (vedi migration_orig_amount.sql)
+        row["orig_amount"] = row["amount"]
 
     dedup = check_duplicates(rows)
     new_rows = dedup["new"]

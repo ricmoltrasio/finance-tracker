@@ -45,7 +45,7 @@ def get_map_points(
     q = (
         client.table("transactions")
         .select(
-            "id,date,description,amount,category,note,tags,source,is_split,"
+            "id,date,description,amount,orig_amount,category,note,tags,source,is_split,"
             "deleted_at,loc_city,loc_lat,loc_lng"
         )
         .is_("deleted_at", "null")
@@ -109,6 +109,7 @@ def get_map_points(
             "date": tx["date"],
             "description": tx["description"],
             "amount": tx["amount"],
+            "orig_amount": tx.get("orig_amount"),
             "category": tx["category"],
             "note": tx.get("note") or "",
             "tags": tx.get("tags") or [],

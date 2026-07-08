@@ -405,6 +405,11 @@ export function EditDrawer({
                   onChange={(e) => setAmountStr(e.target.value)}
                   onBlur={saveAmount}
                 />
+                {t.orig_amount != null && t.orig_amount !== t.amount && (
+                  <p style={{ fontSize: 11.5, color: 'var(--text-3)', margin: '4px 0 0', textAlign: 'right' }}>
+                    originale: {formatEUR(t.orig_amount)}
+                  </p>
+                )}
               </dd>
             </div>
             <div>

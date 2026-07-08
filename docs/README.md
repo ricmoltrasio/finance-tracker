@@ -167,6 +167,8 @@ Le transazioni eliminate non vengono cancellate fisicamente: viene impostato `de
 ### Deduplicazione
 `services/deduplicator.py`: una transazione è considerata duplicata se coincide la tupla **(data, descrizione normalizzata lowercase, importo arrotondato a 2 decimali)**. Il controllo confronta sia con il DB (incluse le righe soft-deleted) sia all'interno dello stesso batch.
 
+Per le righe del DB l'importo confrontato è **`orig_amount`** (congelato all'inserimento, mai aggiornato): se modifichi a mano l'importo di una transazione importata, il re-import dello stesso file **non** reinserisce l'originale. Quando l'importo corrente differisce dall'originale, il drawer di modifica mostra "originale: €X" sotto il campo importo.
+
 ### Calcolo del saldo (timeline)
 `GET /transactions/timeline` parte dal `saldo_iniziale` (impostazioni) e accumula **tutte** le transazioni non eliminate fino a `to_date`, così il saldo a inizio periodo è corretto anche filtrando un intervallo. Granularità giorno/settimana/mese. Modalità `spending` per le sole uscite per categoria.
 
@@ -267,6 +269,8 @@ mypy . --ignore-missing-imports   # type-check Python
 Eseguire una sola volta lo script [`docs/migration_v2.sql`](./migration_v2.sql) nel **SQL Editor di Supabase**. Crea le tabelle, gli indici e i seed delle categorie. Lo schema completo è documentato in [`docs/database_schema.md`](./database_schema.md).
 
 Per il soft-delete eseguire anche [`docs/migration_soft_delete.sql`](./migration_soft_delete.sql).
+
+Per la deduplicazione robusta alle modifiche manuali eseguire [`docs/migration_orig_amount.sql`](./migration_orig_amount.sql).
 
 Per la mappa eseguire [`docs/migration_merchant_locations.sql`](./migration_merchant_locations.sql) e [`docs/migration_transaction_location_override.sql`](./migration_transaction_location_override.sql).
 

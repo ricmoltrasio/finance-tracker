@@ -3,6 +3,9 @@ export interface Transaction {
   date: string
   description: string
   amount: number
+  /** Importo congelato all'inserimento (identità di import per la dedup);
+   *  assente/null per le righe antecedenti alla migration */
+  orig_amount?: number | null
   category: string
   source: 'import' | 'manuale'
   note: string
