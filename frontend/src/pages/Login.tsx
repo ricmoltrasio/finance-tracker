@@ -42,8 +42,8 @@ export default function Login() {
   })
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm anim-up">
         <div className="mb-8 flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center text-[#06120e] shadow-[0_6px_24px_rgba(87,217,176,0.4)]">
             <Icon name="trendUp" size={22} stroke={2.5} />
@@ -54,7 +54,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-surface border border-white/[0.07] p-6">
+        <div className="card" style={{ padding: 24 }}>
           <form onSubmit={onSubmit} className="space-y-4">
             <Input
               label="Email"

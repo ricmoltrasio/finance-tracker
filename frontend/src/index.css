@@ -10,7 +10,8 @@
   /* i widget nativi del browser (calendario date picker, tendine select,
      scrollbar) seguono il tema scuro dell'app */
   color-scheme: dark;
-  --bg: #090b0e;
+  --bg: #070a0e;
+  --bg-2: #05070a;
   --surface: #13171e;
   --surface-2: #191e27;
   --hover: #1f2530;
@@ -23,6 +24,18 @@
   --out: #ff6b6b;
   --accent: #57d9b0;
   --r: 16px;
+
+  /* ---- polish premium: placche matte, elevazione, easing ---- */
+  /* superficie card: nero scuro UNIFORME, non riflettente */
+  --surface-card: #0c0f14;
+  /* riflesso sottile riservato ai soli controlli accento (bottoni/FAB) */
+  --sheen: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  /* ombre di elevazione a due livelli — staccano le placche dallo sfondo colorato */
+  --elev-1: 0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 38px rgba(0, 0, 0, 0.55);
+  --elev-2: 0 6px 16px rgba(0, 0, 0, 0.6), 0 32px 70px rgba(0, 0, 0, 0.62);
+  /* easing */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 * {
@@ -41,16 +54,43 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100vh;
-  background-image: radial-gradient(
-    1200px 520px at 18% -8%,
-    color-mix(in oklab, var(--accent) 12%, transparent),
-    transparent 70%
+}
+
+/* ---- sfondo a gradiente FISSO ----
+   Lo scroll dell'app avviene dentro .app-main (overflow-y:auto), non sul body.
+   Questi due layer sono position:fixed → restano fermi mentre le card scorrono
+   sopra. .app / .app-main / .content restano trasparenti così il gradiente
+   traspare dietro le placche. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  /* gradiente DIAGONALE alto-sinistra (teal) → basso-destra (viola) */
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 42%, #0a1220) 0%,
+    #0a0f19 32%,
+    #080b14 60%,
+    color-mix(in oklab, #7b61ff 40%, #0b0a17) 100%
   );
-  background-attachment: fixed;
+}
+/* grana finissima anti-banding (distingue il gradiente "premium" dal piatto) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 #root {
   min-height: 100vh;
+  position: relative;
+  z-index: 0;
 }
 
 button {
@@ -82,8 +122,14 @@ button {
   flex-direction: column;
   gap: 8px;
   border-right: 1px solid var(--line);
-  background: rgba(11, 13, 16, 0.6);
-  backdrop-filter: blur(8px);
+  /* gradiente PROPRIO della sidebar: un pannello con la sua sfumatura diagonale
+     (stesso stile dello sfondo, ma contenuto in sé — non trasparente) */
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--accent) 24%, #0b1019) 0%,
+    #0a0e15 46%,
+    color-mix(in oklab, #7b61ff 26%, #0a0913) 100%
+  );
 }
 .brand {
   display: flex;
@@ -128,8 +174,10 @@ button {
   color: var(--text);
 }
 .navitem.on {
-  background: color-mix(in oklab, var(--accent) 15%, transparent);
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 26%, transparent),
+    0 4px 14px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 .navitem.on svg {
   color: var(--accent);
@@ -226,12 +274,12 @@ button {
   place-items: center;
   color: var(--text-2);
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--surface-card);
   transition: 0.15s;
 }
 .iconbtn:hover {
   color: var(--text);
-  border-color: var(--line-2);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--line-2));
 }
 
 /* ---------- period pills ---------- */
@@ -263,10 +311,15 @@ button {
 }
 .pill.on {
   color: #06120e;
-  background: var(--accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent) 90%, white),
+    var(--accent)
+  );
   border-color: transparent;
   font-weight: 600;
-  box-shadow: 0 4px 16px color-mix(in oklab, var(--accent) 30%, transparent);
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--accent) 30%, transparent),
+    var(--sheen);
 }
 
 /* Select a forma di pill — dropdown "Mese…" accanto alle period pills */
@@ -442,12 +495,13 @@ button {
 
 /* card categoria cliccabile (Budget) */
 .budget-card {
-  transition: border-color 0.16s, transform 0.16s, box-shadow 0.16s;
+  transition: border-color 0.2s, transform 0.26s var(--ease-spring),
+    box-shadow 0.26s var(--ease-out);
 }
 .budget-card:hover {
-  border-color: var(--line-2);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line-2));
+  transform: translateY(-3px);
+  box-shadow: var(--elev-2);
 }
 
 /* ---------- dropdown categorie con glyph + colori ---------- */
@@ -571,10 +625,12 @@ button {
   margin-bottom: 14px;
 }
 .kpi {
-  background: var(--surface);
+  position: relative;
+  background: var(--surface-card);
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 18px 20px;
+  box-shadow: var(--elev-1);
 }
 .kpi-top {
   display: flex;
@@ -623,10 +679,12 @@ button {
 
 /* ---------- cards ---------- */
 .card {
-  background: var(--surface);
+  position: relative;
+  background: var(--surface-card);
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 20px;
+  box-shadow: var(--elev-1);
 }
 .card-head {
   display: flex;
@@ -848,13 +906,19 @@ button {
   display: grid;
   place-items: center;
   color: #06120e;
-  background: var(--accent);
-  box-shadow: 0 12px 34px color-mix(in oklab, var(--accent) 40%, transparent),
-    0 2px 8px rgba(0, 0, 0, 0.4);
-  transition: 0.18s;
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--accent) 90%, white),
+    var(--accent)
+  );
+  box-shadow: 0 12px 34px color-mix(in oklab, var(--accent) 42%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.4), var(--sheen);
+  transition: transform 0.22s var(--ease-spring), box-shadow 0.22s;
 }
 .fab:hover {
-  transform: translateY(-2px) scale(1.03);
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 16px 40px color-mix(in oklab, var(--accent) 50%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.4), var(--sheen);
 }
 .fab:active {
   transform: scale(0.96);
@@ -895,9 +959,11 @@ button {
   display: none;
   align-items: stretch;
   padding: 6px 6px 12px;
-  background: rgba(13, 16, 20, 0.92);
-  backdrop-filter: blur(16px);
-  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(18, 22, 28, 0.86), rgba(9, 12, 16, 0.94));
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border-top: 1px solid var(--line-2);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
 }
 .bnav {
   flex: 1;
@@ -914,6 +980,9 @@ button {
 }
 .bnav.on {
   color: var(--accent);
+}
+.bnav.on svg {
+  filter: drop-shadow(0 2px 8px color-mix(in oklab, var(--accent) 45%, transparent));
 }
 
 /* ---------- form fields ---------- */
@@ -932,7 +1001,8 @@ button {
   color: var(--text-3);
 }
 .field:focus {
-  border-color: color-mix(in oklab, var(--accent) 50%, var(--line-2));
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line-2));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 14%, transparent);
 }
 /* DateField: input testuale con maschera gg/mm/aaaa (il formato del
    type="date" nativo segue la lingua del browser e non è controllabile) +
@@ -1077,14 +1147,26 @@ textarea.field {
   gap: 7px;
   padding: 9px 15px;
   border-radius: 11px;
-  background: var(--accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent) 88%, white),
+    var(--accent)
+  );
   color: #06120e;
   font-weight: 600;
   font-size: 13.5px;
-  transition: 0.14s;
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--accent) 28%, transparent),
+    var(--sheen);
+  transition: filter 0.14s, transform 0.2s var(--ease-spring), box-shadow 0.2s;
 }
 .btn-accent:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px color-mix(in oklab, var(--accent) 38%, transparent),
+    var(--sheen);
+}
+.btn-accent:active {
+  transform: translateY(0);
 }
 .btn-accent:disabled {
   opacity: 0.5;
@@ -1325,7 +1407,7 @@ textarea.field {
   width: 430px;
   max-width: 92vw;
   height: 100%;
-  background: var(--surface);
+  background: var(--surface-card);
   border-left: 1px solid var(--line-2);
   padding: 22px 22px 26px;
   overflow-y: auto;
@@ -1790,11 +1872,106 @@ textarea.field {
     opacity: 1;
   }
 }
+/* transizione di cambio pagina: ogni pagina monta con questa (fade + slide + scala) */
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.988);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
 .anim-fade {
-  animation: fadeIn 0.3s ease;
+  animation: pageIn 0.5s var(--ease-out) both;
 }
 .anim-up {
   animation: slideUp 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* ---- entrate a cascata (mount pagina) ---- */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .kpis > *,
+  .grid2 > *,
+  .content > section.card,
+  .content > .card {
+    animation: riseIn 0.55s var(--ease-out) both;
+    animation-delay: 0.06s;
+  }
+  .kpis > *:nth-child(1) {
+    animation-delay: 0.06s;
+  }
+  .kpis > *:nth-child(2) {
+    animation-delay: 0.14s;
+  }
+  .kpis > *:nth-child(3) {
+    animation-delay: 0.22s;
+  }
+  .grid2 > *:nth-child(1) {
+    animation-delay: 0.24s;
+  }
+  .grid2 > *:nth-child(2) {
+    animation-delay: 0.32s;
+  }
+}
+
+/* ---- disegno animato dei grafici (wipe sx→dx al mount) ---- */
+@keyframes chartWipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.chart-reveal {
+  animation: chartWipe 0.85s var(--ease-out) both;
+}
+
+/* ---- skeleton shimmer (stati di caricamento) ---- */
+@keyframes shimmer {
+  from {
+    background-position: -180% 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+.skeleton {
+  border-radius: 12px;
+  background: linear-gradient(
+    100deg,
+    var(--surface) 28%,
+    var(--hover) 50%,
+    var(--surface) 72%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+/* ---- accessibilità: rispetta "riduci movimento" ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── pagina Mappa ──────────────────────────────────────────────────────────── */
@@ -1824,8 +2001,9 @@ textarea.field {
   position: relative;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   background: var(--surface);
+  box-shadow: var(--elev-1);
   min-height: 400px;
 }
 .mappa-canvas {
@@ -1858,7 +2036,8 @@ textarea.field {
   flex-shrink: 0;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--surface-card);
+  box-shadow: var(--elev-1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1979,4 +2158,26 @@ button.mappa-tx-row:hover {
 .drawer .mappa-sidebar-stats,
 .drawer .mappa-sidebar-list {
   margin: 0 -22px;
+}
+
+/* ============================================================
+   Filtri, campi di ricerca e selettori: stesso nero opaco delle placche.
+   Uso background-color (non lo shorthand) per non azzerare la freccia dei
+   <select> né il gradiente degli stati attivi (.pill.on ecc., più specifici).
+   ============================================================ */
+.field,
+.pill,
+.pill-select,
+.sortpill,
+.catsel-trigger,
+.filter-btn,
+.period-chip,
+.period-pill {
+  background-color: var(--surface-card);
+}
+/* Gli input di testo dentro una placca (Impostazioni) o un drawer/foglio
+   restano più chiari: un input nero su placca nera sparirebbe. */
+.card .field,
+.drawer .field {
+  background-color: var(--surface-2);
 }

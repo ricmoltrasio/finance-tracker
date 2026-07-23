@@ -94,17 +94,22 @@ export function SpendingBars({ series, height = 220, fmt, locale = 'it-IT', gran
       return `<rect x="${(cx - barW / 2 - 2).toFixed(1)}" y="${padT}" width="${(barW + 4).toFixed(1)}" height="${innerH}" rx="2" fill="rgba(255,255,255,0.06)"/>`
     })() : ''
 
+    // un gradiente verticale per serie (colore pieno in alto → più tenue in basso)
+    const defs = series.map((sr, si) =>
+      `<linearGradient id="bg${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${sr.color}" stop-opacity="0.98"/><stop offset="100%" stop-color="${sr.color}" stop-opacity="0.6"/></linearGradient>`
+    ).join('')
+
     const bars = matrix.map((m, i) => {
       const cx = padL + (i + 0.5) * barStep
       const x = cx - barW / 2
-      const rx = Math.min(2, barW / 3).toFixed(1)
+      const rx = Math.min(3, barW / 2.4).toFixed(1)
       let yBottom = padT + innerH
       return series.map((sr, si) => {
         const amt = m.amounts[si]
         if (!amt) return ''
         const bh = Math.max(0, (amt / maxTotal) * innerH)
         yBottom -= bh
-        return `<rect x="${x.toFixed(1)}" y="${yBottom.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="${rx}" fill="${sr.color}" fill-opacity="0.8"/>`
+        return `<rect x="${x.toFixed(1)}" y="${yBottom.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="${rx}" fill="url(#bg${si})"/>`
       }).join('')
     }).join('')
 
@@ -113,7 +118,7 @@ export function SpendingBars({ series, height = 220, fmt, locale = 'it-IT', gran
       return `<text x="${cx.toFixed(1)}" y="${H - 10}" fill="rgba(255,255,255,0.42)" font-size="11" font-family="system-ui" font-weight="600" text-anchor="middle" letter-spacing="0.5">${t.label}</text>`
     }).join('')
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}">${grid}${hl}${bars}${labels}</svg>`
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}"><defs>${defs}</defs>${grid}${hl}${bars}${labels}</svg>`
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
   }, [matrix, hover, w, H, barStep, barW, innerH, padT, padL, padR, series, maxTotal, ticks, n])
 
@@ -153,7 +158,7 @@ export function SpendingBars({ series, height = 220, fmt, locale = 'it-IT', gran
       onTouchEnd={() => setHover(null)}
     >
       {imgSrc && (
-        <img src={imgSrc} draggable={false}
+        <img className="chart-reveal" src={imgSrc} draggable={false}
           style={{ display: 'block', width: '100%', height: H, userSelect: 'none' }}
           alt="Spese" />
       )}

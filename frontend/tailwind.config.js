@@ -6,7 +6,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#090B0E', // --bg
+        bg: '#070A0E', // --bg
         surface: '#13171E', // --surface
         surface2: '#191E27', // --surface-2
         accent: '#57D9B0', // --accent

@@ -166,10 +166,10 @@ export function SaldoChart({
     } else {
       const d = smoothD(pts)
       const area = `${d} L ${pts[pts.length - 1].x.toFixed(1)} ${base} L ${pts[0].x.toFixed(1)} ${base} Z`
-      body = `<path d="${area}" fill="url(#g)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round"/>`
+      body = `<path d="${area}" fill="url(#g)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#lglow)"/>`
     }
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.34"/><stop offset="55%" stop-color="${color}" stop-opacity="0.08"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}${body}${tk}</svg>`
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.42"/><stop offset="52%" stop-color="${color}" stop-opacity="0.10"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient><filter id="lglow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="${color}" flood-opacity="0.5"/></filter></defs>${grid}${body}${tk}</svg>`
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg)
   }, [geom, w, H, color, mode, ticks, series.length])
 
@@ -211,6 +211,7 @@ export function SaldoChart({
     >
       {imgSrc && (
         <img
+          className="chart-reveal"
           src={imgSrc}
           draggable={false}
           style={{ display: 'block', width: '100%', height: H, userSelect: 'none' }}
