@@ -1663,7 +1663,7 @@ textarea.field {
     width: 100%;
     max-width: 100%;
     height: auto;
-    max-height: 90vh;
+    max-height: 80vh;
     border-left: none;
     border-top: 1px solid var(--line-2);
     border-radius: 22px 22px 0 0;
@@ -1680,6 +1680,16 @@ textarea.field {
     border-radius: 2px;
     background: var(--line-2);
     margin: 2px auto 12px;
+  }
+  /* intestazione del foglio (titolo + ✕) fissa in cima mentre il contenuto
+     scorre: prima scorreva via insieme alla lista */
+  .drawer-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--surface-card);
+    margin: 0 -22px 12px;
+    padding: 4px 22px 12px;
   }
 
   /* Panoramica KPI: 2+1 (Spese+Entrate su fila, Saldo a piena larghezza) */
@@ -1877,12 +1887,10 @@ textarea.field {
   from {
     opacity: 0;
     transform: translateY(16px) scale(0.988);
-    filter: blur(5px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
 }
 .anim-fade {
