@@ -1662,34 +1662,43 @@ textarea.field {
   .drawer {
     width: 100%;
     max-width: 100%;
-    height: auto;
-    max-height: 80vh;
+    height: 80vh; /* fallback per browser senza dvh */
+    height: 80dvh; /* apertura target ~80% dell'area visibile (tiene conto della barra browser) */
+    max-height: 80dvh;
     border-left: none;
     border-top: 1px solid var(--line-2);
     border-radius: 22px 22px 0 0;
+    padding-top: 0; /* la testata sticky fornisce lo spazio in alto */
     padding-bottom: calc(26px + env(safe-area-inset-bottom));
     box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.55);
     animation: sheetUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  /* maniglia di trascinamento del sheet */
+  /* la maniglia vive DENTRO la testata sticky (vedi .drawer-head::before), non
+     nel contenitore che scorre: altrimenti lascia un varco sopra l'intestazione */
   .drawer::before {
-    content: "";
-    display: block;
-    width: 42px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--line-2);
-    margin: 2px auto 12px;
+    content: none;
   }
-  /* intestazione del foglio (titolo + ✕) fissa in cima mentre il contenuto
-     scorre: prima scorreva via insieme alla lista */
+  /* intestazione (maniglia + titolo + ✕) ancorata in cima: copre l'intera
+     fascia superiore col colore del foglio mentre il contenuto scorre sotto */
   .drawer-head {
     position: sticky;
     top: 0;
     z-index: 3;
     background: var(--surface-card);
-    margin: 0 -22px 12px;
-    padding: 4px 22px 12px;
+    margin: 0 -22px 14px;
+    padding: 18px 22px 12px;
+    border-radius: 22px 22px 0 0;
+  }
+  .drawer-head::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line-2);
   }
 
   /* Panoramica KPI: 2+1 (Spese+Entrate su fila, Saldo a piena larghezza) */
@@ -1893,8 +1902,13 @@ textarea.field {
     transform: none;
   }
 }
+/* fill-mode `backwards` (non `both`): copre lo stato iniziale evitando il flash,
+   ma NON trattiene lo stato finale. Con `both` il browser lascia a riposo
+   transform:matrix(1,0,0,1,0,0) (identità): pur non spostando nulla, un transform
+   ≠none crea un containing block che rompe il position:fixed dei bottom sheet
+   figli (.drawer-scrim), ancorandoli a .content invece che al viewport. */
 .anim-fade {
-  animation: pageIn 0.5s var(--ease-out) both;
+  animation: pageIn 0.5s var(--ease-out) backwards;
 }
 .anim-up {
   animation: slideUp 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
