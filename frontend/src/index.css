@@ -1974,11 +1974,14 @@ textarea.field {
 }
 .skeleton {
   border-radius: 12px;
+  /* base = --hover (non --surface): alcuni contenitori (.cat-acc, .mappa-map-wrap)
+     hanno già sfondo --surface, e uno skeleton a riposo dello stesso colore del
+     genitore sparirebbe fuori dal breve passaggio dello shimmer. */
   background: linear-gradient(
     100deg,
-    var(--surface) 28%,
-    var(--hover) 50%,
-    var(--surface) 72%
+    var(--hover) 28%,
+    color-mix(in oklab, var(--hover) 45%, white) 50%,
+    var(--hover) 72%
   );
   background-size: 220% 100%;
   animation: shimmer 1.3s ease-in-out infinite;

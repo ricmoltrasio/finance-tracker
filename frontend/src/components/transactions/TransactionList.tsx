@@ -1,6 +1,6 @@
 import type { Transaction } from '../../types'
 import { TransactionRow } from './TransactionRow'
-import { Spinner } from '../common/Spinner'
+import { TxRowsSkeleton } from '../skeletons/TxRowsSkeleton'
 
 interface Props {
   transactions: Transaction[]
@@ -13,11 +13,7 @@ interface Props {
 
 export function TransactionList({ transactions, loading, onSelect, onToggleMerchant, selectedMerchants }: Props) {
   if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner />
-      </div>
-    )
+    return <TxRowsSkeleton rows={8} />
   }
 
   if (!transactions.length) {

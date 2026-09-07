@@ -33,8 +33,8 @@ Legge `SUPABASE_URL`/`SUPABASE_KEY` da `backend/.env`. Copiare il file su Drive.
 
 1. Su GitHub: **New repository** → nome `finance-tracker-backup` → **Private** → spunta "Add a README" → Create.
 2. Nel nuovo repo: **Settings → Secrets and variables → Actions → New repository secret**, due volte:
-   - `SUPABASE_URL` = lo stesso valore usato su Railway
-   - `SUPABASE_KEY` = la **service role key** (stessa di Railway)
+   - `SUPABASE_URL` = lo stesso valore impostato su Cloud Run
+   - `SUPABASE_KEY` = la **service role key** (stessa di Cloud Run)
 3. Nel nuovo repo: **Add file → Create new file** → percorso `.github/workflows/backup.yml` → incollare:
 
 ```yaml
@@ -104,5 +104,5 @@ Scenario: progetto Supabase perso o corrotto.
    ```
    Lo script chiede conferma esplicita mostrando l'URL di destinazione.
 5. Eseguire nel SQL Editor gli `setval(...)` che lo script stampa a fine restore (riallineano le sequence: senza, i prossimi insert collidono sugli id esistenti).
-6. Aggiornare `SUPABASE_URL`/`SUPABASE_KEY` su Railway e `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` su Vercel; ricreare l'utente in Supabase Auth (Authentication → Users).
+6. Aggiornare `SUPABASE_URL`/`SUPABASE_KEY` sul servizio Cloud Run (vedi [`deploy_cloudrun.md`](./deploy_cloudrun.md#4-variabili-dambiente)) e `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` su Vercel; ricreare l'utente in Supabase Auth (Authentication → Users).
 7. Smoke test: login, transazioni, mappa.

@@ -7,7 +7,7 @@ import { catMeta } from '../types'
 import type { Transaction } from '../types'
 import { CatGlyph } from '../components/common/CatGlyph'
 import { Icon } from '../components/common/Icon'
-import { Spinner } from '../components/common/Spinner'
+import { BudgetSkeleton } from '../components/skeletons/BudgetSkeleton'
 import { TransactionList } from '../components/transactions/TransactionList'
 import { EditDrawer } from '../components/transactions/TransactionDrawer'
 import { formatEUR } from '../utils/format'
@@ -206,11 +206,7 @@ export default function Budget() {
         onClear={merchantSel.clear}
       />
 
-      {isLoading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <BudgetSkeleton isMobile={isMobile} />}
 
       {!isLoading && (
         <>

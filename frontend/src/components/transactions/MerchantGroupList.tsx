@@ -3,7 +3,7 @@ import type { Transaction } from '../../types'
 import { catMeta } from '../../types'
 import { CatGlyph } from '../common/CatGlyph'
 import { Icon } from '../common/Icon'
-import { Spinner } from '../common/Spinner'
+import { MerchantGroupSkeleton } from '../skeletons/MerchantGroupSkeleton'
 import { TransactionRow } from './TransactionRow'
 import { formatEUR } from '../../utils/format'
 
@@ -47,11 +47,7 @@ export function MerchantGroupList({ transactions, loading, onSelect, onToggleMer
   }, [transactions])
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner />
-      </div>
-    )
+    return <MerchantGroupSkeleton rows={8} />
   }
   if (!groups.length) {
     return <div className="empty">Nessuna transazione trovata</div>

@@ -9,7 +9,8 @@ import { catMeta } from '../types'
 import type { Category } from '../types'
 import { Icon } from '../components/common/Icon'
 import { CatGlyph } from '../components/common/CatGlyph'
-import { Spinner } from '../components/common/Spinner'
+import { SettingsCatSkeleton } from '../components/skeletons/SettingsCatSkeleton'
+import { Skeleton } from '../components/common/Skeleton'
 
 function CategoryRow({ cat }: { cat: Category }) {
   const [open, setOpen] = useState(false)
@@ -229,15 +230,18 @@ export default function Settings() {
 
       <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, padding: '10px 14px' }}>
         <p className="card-eyebrow" style={{ margin: 0, whiteSpace: 'nowrap' }}>Saldo di partenza</p>
-        <input
-          className="field"
-          type="number"
-          step="0.01"
-          value={saldo}
-          onChange={(e) => setSaldo(e.target.value)}
-          disabled={isLoading}
-          style={{ width: 140, margin: 0 }}
-        />
+        {isLoading ? (
+          <Skeleton style={{ width: 140, height: 38, borderRadius: 11 }} />
+        ) : (
+          <input
+            className="field"
+            type="number"
+            step="0.01"
+            value={saldo}
+            onChange={(e) => setSaldo(e.target.value)}
+            style={{ width: 140, margin: 0 }}
+          />
+        )}
         <button className="btn-accent" onClick={save} disabled={update.isPending || isLoading} style={{ whiteSpace: 'nowrap' }}>
           {update.isPending ? 'Salvataggio…' : 'Salva'}
         </button>
@@ -270,11 +274,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {loadingCats && (
-        <div className="flex justify-center py-8">
-          <Spinner />
-        </div>
-      )}
+      {loadingCats && <SettingsCatSkeleton rows={8} />}
 
       {expenses.length > 0 && (
         <section style={{ marginBottom: 24 }}>

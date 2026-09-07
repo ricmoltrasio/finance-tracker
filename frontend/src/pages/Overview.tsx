@@ -10,6 +10,7 @@ import type { SpendingSeries } from '../components/charts/SpendingBars'
 import { Icon } from '../components/common/Icon'
 import { CatGlyph } from '../components/common/CatGlyph'
 import { Spinner } from '../components/common/Spinner'
+import { OverviewSkeleton } from '../components/skeletons/OverviewSkeleton'
 import { EditDrawer, CreateDrawer } from '../components/transactions/TransactionDrawer'
 import { useToast } from '../context/ToastContext'
 import { formatEUR, today } from '../utils/format'
@@ -523,9 +524,7 @@ export default function Overview() {
         )}
 
         {loadingSummary ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+          <OverviewSkeleton />
         ) : (
           <>
             {/* KPI */}

@@ -41,6 +41,10 @@ finance-tracker/
 
 L'autenticazione è gestita da Supabase Auth: il frontend ottiene un JWT al login, lo invia in `Authorization: Bearer <token>` su ogni richiesta, e il backend lo valida con `client.auth.get_user()` (`deps.get_current_user`). Tutti gli endpoint applicativi richiedono un token valido. Una risposta `401` causa logout automatico e redirect a `/login` (via `window.location.replace`).
 
+### Caricamento (skeleton)
+
+Il backend gira su Cloud Run scale-to-zero: al primo caricamento di una pagina dopo un periodo di inattività il cold start può richiedere diversi secondi. Ogni pagina/lista mostra in quell'attesa uno skeleton che ricalca la forma reale del contenuto (`components/skeletons/`, primitiva `components/common/Skeleton.tsx`, shimmer CSS `.skeleton` in `index.css`) invece di uno spinner generico — riusando le classi CSS reali della pagina, il comportamento responsive mobile è automatico. Vale solo per il primo caricamento (`isLoading` di React Query, nessun dato in cache): paginazione, azioni in corso e il check sessione restano con lo spinner esistente. Dettagli in `evoluzioni/done_skeleton_loading.md`.
+
 ### Adattamento mobile
 
 Breakpoint `@media (max-width: 640px)` separato dall'attuale `860px` (sidebar→bottomnav). Su mobile:

@@ -10,6 +10,7 @@ import type { MapPoint } from '../api/locations'
 import type { Transaction } from '../types'
 import { catMeta } from '../types'
 import { Spinner } from '../components/common/Spinner'
+import { Skeleton } from '../components/common/Skeleton'
 import { CatGlyph } from '../components/common/CatGlyph'
 import { Icon } from '../components/common/Icon'
 import { MobileSheet } from '../components/common/MobileSheet'
@@ -238,9 +239,7 @@ export default function Mappa() {
         {/* mappa */}
         <div className="mappa-map-wrap">
           {isLoading && (
-            <div className="mappa-loading">
-              <Spinner className="h-6 w-6" />
-            </div>
+            <Skeleton style={{ position: 'absolute', inset: 0, borderRadius: 14 }} />
           )}
           <div ref={containerRef} className="mappa-canvas" />
           {!isLoading && points?.length === 0 && (
